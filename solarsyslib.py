@@ -98,8 +98,7 @@ def is_planet_or_moon(name):
         return False
 
 
-def is_multiple_asteroid(name,
-                         _f_base='/Users/dmitryduev/_caltech/roboao/asteroids/multiples-names.txt'):
+def is_multiple_asteroid(name, _f_base='multiples-names.txt'):
     """
 
     :param name:
@@ -678,9 +677,10 @@ class TargetXML(object):
         Class to handle queue target xml files
     """
 
-    def __init__(self, path, program_number):
+    def __init__(self, path, program_number, server='http://localhost:8080'):
         self.program_number = int(program_number)
         self.path = os.path.join(path, 'Program_{:d}'.format(int(program_number)))
+        self.server = server
         self.Targets = None
 
     def getAllTargetXML(self):
@@ -784,6 +784,7 @@ class TargetXML(object):
 
         :param targets:
         :param epoch:
+        :param _server:
         :return:
         """
         # load existing target xml data:
@@ -888,7 +889,15 @@ class TargetXML(object):
                     f.write('{:s}\n'.format(line))
                 f.write('{:s}'.format(target_xml[-1]))
 
-    def clean_target_list(self, _server='http://localhost:8080'):
+        # update Programs.xml if necessary
+        try:
+            r = requests.get(self.server, auth=('admin', 'robo@0'))
+            if int(r.status_code) != 200:
+                    print('server error')
+        except Exception:
+            print('failed to connect to the website.')
+
+    def clean_target_list(self):
         pnot = len([_f for _f in os.listdir(self.path)
                     if 'Target_' in _f and _f[0] != '.'])
         # iterate over target xml files
@@ -931,7 +940,7 @@ class TargetXML(object):
         if len(target_nums_to_remove) > 0:
             try:
                 for _targ_num in target_nums_to_remove[::-1]:
-                    r = requests.get(os.path.join(_server, 'removeTarget'),
+                    r = requests.get(os.path.join(self.server, 'removeTarget'),
                                      auth=('admin', 'robo@0'),
                                      params={'program_number': int(self.program_number),
                                              'target_number': int(_targ_num)})
@@ -941,7 +950,7 @@ class TargetXML(object):
                 print('removed {:d} targets that are no longer suitable for observations.'
                       .format(len(target_nums_to_remove)))
                 # call main page to modify/fix Programs.xml
-                r = requests.get(_server, auth=('admin', 'robo@0'))
+                r = requests.get(self.server, auth=('admin', 'robo@0'))
                 if int(r.status_code) != 200:
                         print('server error')
             except Exception:

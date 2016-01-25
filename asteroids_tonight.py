@@ -17,69 +17,6 @@ from astropy.table import Table
 from astropy import units as u
 from solarsyslib import TargetListAsteroids, TargetXML, get_guide_star
 import pytz
-import xml.etree.ElementTree as ET
-import requests
-
-
-def clean_target_list(_path, _program_number, _server='http://localhost:8080'):
-    target_xml_path = os.path.join(_path, 'Program_{:s}'.format(str(_program_number)))
-    pnot = len([_f for _f in os.listdir(target_xml_path)
-                    if 'Target_' in _f and _f[0] != '.'])
-    # iterate over target xml files
-    target_nums_to_remove = []
-
-    target_list_xml = ['Target_{:d}.xml'.format(i+1) for i in range(int(pnot))]
-
-    for targ_num, target_xml in enumerate(target_list_xml):
-        tree = ET.parse(os.path.join(target_xml_path, target_xml))
-        root = tree.getroot()
-
-        targ = {}
-        targ['Object'] = []
-        for content in root:
-            if content.tag != 'Object':
-                targ[content.tag] = content.text
-            else:
-                obj = {}
-                obj['Observation'] = []
-                for data_obj in content:
-                    if data_obj.tag != 'Observation':
-                        obj[data_obj.tag] = data_obj.text
-                    else:
-                        obs = {}
-                        for data_obs in data_obj:
-                            obs[data_obs.tag] = data_obs.text
-                        obj['Observation'].append(obs)
-                targ['Object'].append(obj)
-
-        t_xml = datetime.datetime.strptime(' '.join(targ['comment'].split()[-2:]),
-                                           '%Y-%m-%d %H:%M:%S.%f')
-        # updated > 2 days ago?
-        if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
-                and targ['done'] == '0':
-            # print(targ['comment'], targ['done'])
-            target_nums_to_remove.append(targ_num+1)
-
-    # TODO: add try/except clause + check server status (should be 200 - OK)
-    # now remove the xml files. start from end not to scoop numbering
-    if len(target_nums_to_remove) > 0:
-        try:
-            for _targ_num in target_nums_to_remove[::-1]:
-                r = requests.get(os.path.join(_server, 'removeTarget'),
-                                 auth=('admin', 'robo@0'),
-                                 params={'program_number': int(_program_number),
-                                         'target_number': int(_targ_num)})
-                # print(_targ_num, r.status_code)
-                if int(r.status_code) != 200:
-                    print('server error')
-            print('removed {:d} targets that are no longer suitable for observations.'
-                  .format(len(target_nums_to_remove)))
-            # call main page to modify/fix Programs.xml
-            r = requests.get(_server, auth=('admin', 'robo@0'))
-            if int(r.status_code) != 200:
-                    print('server error')
-        except Exception:
-            print('failed to remove targets via the website.')
 
 
 if __name__ == '__main__':
@@ -90,7 +27,7 @@ if __name__ == '__main__':
     f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
 
     # process all or only known multiples?
-    do = '_all_'
+    do = 'all'
 
     if do != 'all':
         ''' known main-belt multiples '''
@@ -131,9 +68,9 @@ if __name__ == '__main__':
     ''' make/change XML files '''
     path = '/Users/dmitryduev/web/qserv/operation'
     program_number = 4
-    txml = TargetXML(path=path, program_number=program_number)
+    txml = TargetXML(path=path, program_number=program_number, server='http://localhost:8080')
     # dump 'em targets!
     txml.dumpTargets(targets, epoch='J2000')
 
     # clean up the target list - remove unobserved, which are not suitable anymore:
-    txml.clean_target_list(_server='http://localhost:8080')
+    txml.clean_target_list()
