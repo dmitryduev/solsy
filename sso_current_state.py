@@ -17,6 +17,8 @@ from pypride.vintflib import pleph
 import linecache
 from astropy.time import Time
 from pypride.classes import inp_set
+import ephem
+import datetime
 
 # from asterlib import TargetListAsteroids, TargetXML
 
@@ -365,7 +367,7 @@ def asteroid_data_load(_f_database, asteroid_name):
                                tuple(map(float, l[25:].split()[:-2])))], dtype=dt)
 
 
-def get_current_state(_asteroid, _inp):
+def get_current_state_asteroid(_asteroid, _inp):
     """
     :param _asteroid:
     :return:
@@ -384,6 +386,55 @@ def get_current_state(_asteroid, _inp):
     ''' !!! NOTE: ra rate must be with a minus sign !!! '''
     ra_rate = '{:.5f}'.format(-radec_dot[0])
     dec_rate = '{:.5f}'.format(radec_dot[1])
+
+    return ra, dec, ra_rate, dec_rate
+
+
+def is_planet_or_moon(_name):
+    """
+
+    :param _name: body name
+    :return:
+    """
+    planets = ('mercury', 'venus', 'earth', 'mars', 'jupiter',
+               'saturn', 'uranus', 'neptune')
+    moons = ('moon',
+             'deimos', 'phobos',
+             'europa', 'io', 'ganymede', 'callisto',
+             'titan', 'enceladus', 'dione', 'hyperion', 'iapetus', 'mimas', 'rhea', 'tethys',
+             'miranda', 'ariel', 'umbriel', 'oberon', 'titania')
+
+    if _name.lower() in planets or 'pluto' in _name.lower() or _name.lower() in moons:
+        return True
+    else:
+        return False
+
+
+def get_current_state_planet_or_moon(body):
+    """
+        Get observational parameters for a SS target
+    """
+    # get middle of night:
+    t = Time.now().utc.datetime
+
+    b = None  # I don't like red
+    exec('b = ephem.{:s}()'.format(body.title()))
+    b.compute(ephem.Date(t), epoch='2000')
+
+    ra = b.a_ra
+    dec = b.a_dec
+
+    # compute rates in arcsec/s:
+    dt = datetime.timedelta(seconds=1)
+    b.compute(ephem.Date(t + dt), epoch='2000')
+    ra_p1 = b.a_ra*180.0/np.pi*3600.0
+    dec_p1 = b.a_dec*180.0/np.pi*3600.0
+    b.compute(ephem.Date(t - dt), epoch='2000')
+    ra_m1 = b.a_ra*180.0/np.pi*3600.0
+    dec_m1 = b.a_dec*180.0/np.pi*3600.0
+
+    ra_rate = (ra_p1 - ra_m1)/2.0
+    dec_rate = (dec_p1 - dec_m1)/2.0
 
     return ra, dec, ra_rate, dec_rate
 
@@ -414,35 +465,46 @@ if __name__ == '__main__':
     ra_rate_apr = args.ra_rate_apr
     dec_rate_apr = args.dec_rate_apr
 
-    # asteroid database:
-    path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
-    f_database = os.path.join(path_to_database, 'ELEMENTS.numbr')
+    if not is_planet_or_moon(name):
+        ''' asteroids '''
+        # asteroid database:
+        path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
+        f_database = os.path.join(path_to_database, 'ELEMENTS.numbr')
 
-    try:
-        asteroid = asteroid_data_load(_f_database=f_database, asteroid_name=name)
-        # print(asteroid)
-    except Exception:
-        # print error code 2 (failed to load asteroid database) and exit
-        print(2, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
-        raise SystemExit
+        try:
+            asteroid = asteroid_data_load(_f_database=f_database, asteroid_name=name)
+            # print(asteroid)
+        except Exception:
+            # print error code 2 (failed to load asteroid database) and exit
+            print(2, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
+            raise SystemExit
 
-    try:
-        f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
-        inp = inp_set(f_inp).get_section('all')
-    except Exception:
-        # print error code 3 (failed to load JPL DE ephemeris) and exit
-        print(3, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
-        raise SystemExit
+        try:
+            f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
+            inp = inp_set(f_inp).get_section('all')
+        except Exception:
+            # print error code 3 (failed to load JPL DE ephemeris) and exit
+            print(3, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
+            raise SystemExit
 
-    try:
-        ra, dec, ra_rate, dec_rate = get_current_state(_asteroid=asteroid, _inp=inp)
-        print(0, ra, dec, ra_rate, dec_rate)
-    except Exception:
-        # print error code 4 (calculation failed) and exit
-        print(4, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
-        raise SystemExit
+        try:
+            ra, dec, ra_rate, dec_rate = get_current_state_asteroid(_asteroid=asteroid, _inp=inp)
+            print(0, ra, dec, ra_rate, dec_rate)
+        except Exception:
+            # print error code 4 (calculation failed) and exit
+            print(4, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
+            raise SystemExit
 
-    # tl = TargetListAsteroids(f_database, f_inp)
-    # ra, dec, ra_rate, dec_rate = tl.get_current_state(name)
+        # tl = TargetListAsteroids(f_database, f_inp)
+        # ra, dec, ra_rate, dec_rate = tl.get_current_state(name)
 
-    # print(ra, dec, ra_rate, dec_rate)
+        # print(ra, dec, ra_rate, dec_rate)
+    else:
+        ''' planets and moons '''
+        try:
+            ra, dec, ra_rate, dec_rate = get_current_state_planet_or_moon(name)
+            print(0, ra, dec, ra_rate, dec_rate)
+        except Exception:
+            # print error code 4 (calculation failed) and exit
+            print(4, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
+            raise SystemExit

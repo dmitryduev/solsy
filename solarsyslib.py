@@ -42,6 +42,8 @@ from astroplan import observability_table  # , is_observable, is_always_observab
 from astroplan import time_grid_from_range
 from astroplan import AtNightConstraint, AltitudeConstraint
 
+import ephem
+
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from dicttoxml import dicttoxml
@@ -91,7 +93,12 @@ def is_planet_or_moon(name):
     """
     planets = ('mercury', 'venus', 'earth', 'mars', 'jupiter',
                'saturn', 'uranus', 'neptune')
-    moons = ('io', 'europa', 'titan')
+    moons = ('moon',
+             'deimos', 'phobos',
+             'europa', 'io', 'ganymede', 'callisto',
+             'titan', 'enceladus', 'dione', 'hyperion', 'iapetus', 'mimas', 'rhea', 'tethys',
+             'miranda', 'ariel', 'umbriel', 'oberon', 'titania')
+
     if name.lower() in planets or 'pluto' in name.lower() or name.lower() in moons:
         return True
     else:
@@ -411,28 +418,127 @@ class TargetListPlanetsAndMoons(object):
         inp = inp_set(_f_inp)
         self.inp = inp.get_section('all')
 
-    def get_current_state(self, name):
+    def middle_of_night(self, day):
         """
-        :param name:
+            day - datetime.datetime object, 0h UTC of the coming day
+        """
+        #        day = datetime.datetime(2015,11,7) # for KP, in UTC it is always 'tomorrow'
+        nextDay = day + datetime.timedelta(days=1)
+        astrot = Time([str(day), str(nextDay)], format='iso', scale='utc')
+        # when the night comes, heh?
+        sunSet = self.observatory.sun_set_time(astrot[0])
+        sunRise = self.observatory.sun_rise_time(astrot[1])
+
+        night = Time([str(sunSet.datetime), str(sunRise.datetime)],
+                     format='iso', scale='utc')
+
+        # build time grid for the night to come
+        time_grid = time_grid_from_range(night)
+        middle_of_night = time_grid[len(time_grid) / 2]
+
+        return night, middle_of_night
+
+    def target_list_all(self, day):
+        """
+            Get observational parameters for a (masked) target list
+            from self.database
+        """
+        # get middle of night:
+        _, middle_of_night = self.middle_of_night(day)
+        # mjd = middle_of_night.tdb.mjd  # in TDB!!
+        t = middle_of_night.datetime
+        # print(t)
+        # go over planets/moons:
+        bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto',
+                  'phobos',
+                  'europa', 'io', 'ganymede', 'callisto',
+                  'titan', 'enceladus', 'iapetus', 'mimas']
+        target_list = []
+
+        b = None  # I don't like red
+        for body in bodies:
+            exec('b = ephem.{:s}()'.format(body.title()))
+
+            b.compute(ephem.Date(t))
+            if body == 'europa':
+                b.mag = 5.29
+            elif body == 'io':
+                b.mag = 5.02
+            elif body == 'ganymede':
+                b.mag = 4.61
+            elif body == 'callisto':
+                b.mag = 5.65
+            elif body == 'titan':
+                b.mag = 8.5
+            elif body == 'enceladus':
+                b.mag = 11.7
+            elif body == 'iapetus':
+                b.mag = 11.0
+            elif body == 'mimas':
+                b.mag = 12.9
+            elif body == 'phobos':
+                b.mag = 11.3
+
+            ra = b.a_ra
+            dec = b.a_dec
+            try:
+                mag = b.mag
+            except AttributeError:
+                b.mag = 9.99
+                mag = b.mag
+
+            # compute rates in arcsec/s:
+            dt = datetime.timedelta(seconds=1)
+            b.compute(ephem.Date(t + dt))
+            ra_p1 = b.a_ra*180.0/np.pi*3600.0
+            dec_p1 = b.a_dec*180.0/np.pi*3600.0
+            b.compute(ephem.Date(t - dt))
+            ra_m1 = b.a_ra*180.0/np.pi*3600.0
+            dec_m1 = b.a_dec*180.0/np.pi*3600.0
+
+            ra_rate = (ra_p1 - ra_m1)/2.0
+            dec_rate = (dec_p1 - dec_m1)/2.0
+
+            print(body, ra, dec, ra_rate, dec_rate, mag)
+
+            target_list.append([{'name': body}, middle_of_night,
+                                [ra, dec], [ra_rate, dec_rate], mag])
+
+        return np.array(target_list)
+
+    def target_list_observable(self, target_list, day,
+                               constraints=None, fraction=0.1):
+        """ Check whether targets are observable and return only those
+
+        :param target_list:
+        :param day:
+        :param constraints:
+        :param fraction:
         :return:
-         current J2000 ra/dec of a moving object
-         current J2000 ra/dec rates of a moving object
-         if mag <= self.m_lim
         """
-        number = int(name.split(' ')[0])
-        asteroid = self.database[number-1]
 
-        radec, radec_dot, _ = self.getObsParams(asteroid, Time.now().tdb.mjd)
+        night, middle_of_night = self.middle_of_night(day)
+        if constraints is None:
+            # set constraints (above 40 deg altitude, Sun altitude < -12 deg)
+            constraints = [AltitudeConstraint(40 * u.deg, 90 * u.deg),
+                           AtNightConstraint.twilight_nautical()]
 
-        # reformat
-        ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
-        dec = dms(radec[1])
-        dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-        ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-        ra_rate = '{:.5f}'.format(-radec_dot[0])
-        dec_rate = '{:.5f}'.format(radec_dot[1])
+        radec = np.array(list(target_list[:, 2]))
+        # tic = _time()
+        coords = SkyCoord(ra=radec[:, 0], dec=radec[:, 1],
+                          unit=(u.rad, u.rad), frame='icrs')
+        # print(_time() - tic)
+        tic = _time()
+        table = observability_table(constraints, self.observatory, coords,
+                                    time_range=night)
+        print('observability computation took: ', _time() - tic)
 
-        return ra, dec, ra_rate, dec_rate
+        # proceed with observable (for more than 5% of the night) targets only
+        mask_observable = table['fraction of time observable'] > fraction
+
+        target_list_observeable = target_list[mask_observable]
+        print('total bright: ', len(target_list), 'observable: ', len(target_list_observeable))
+        return target_list_observeable
 
 
 class TargetListAsteroids(object):
@@ -745,7 +851,7 @@ class TargetXML(object):
         return OrderedDict([('program_number', program_number),
                             ('number', ''),
                             ('name', ''),
-                            ('visited_times_for_completion', 1),
+                            ('visited_times_for_completion', 3),
                             # ('seeing_limit', ''),
                             ('visited_times', 0),
                             ('done', 0),
@@ -771,11 +877,11 @@ class TargetXML(object):
                                            ('done', 0),
                                            ('Observation',
                                             [OrderedDict([('number', 1),
-                                                          ('exposure_time', 150),
+                                                          ('exposure_time', 90),
                                                           ('ao_flag', 1),
-                                                          ('filter_code', 'LP600'),
+                                                          ('filter_code', 'FILTER_LONGPASS_600'),
                                                           ('camera_mode', ''),
-                                                          ('repeat_times', 3),
+                                                          ('repeat_times', 1),
                                                           ('repeated', 0),
                                                           ('done', 0)])])])])])
 
@@ -830,6 +936,8 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                if is_planet_or_moon(name):
+                    xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                 xml['Object'][0]['Observation'][0]['camera_mode'] = \
                     '{:s}'.format(getModefromMag(target[4]))
 
@@ -860,6 +968,8 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                if is_planet_or_moon(name):
+                    xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                 xml['Object'][0]['Observation'][0]['camera_mode'] = \
                     '{:s}'.format(getModefromMag(target[4]))
 
@@ -931,7 +1041,7 @@ class TargetXML(object):
                                                '%Y-%m-%d %H:%M:%S.%f')
             # updated > 2 days ago?
             if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
-                    and targ['done'] == '0':
+                    and targ['done'] == '0' and targ['Object']['Observation']['repeated'] == '0':
                 # print(targ['comment'], targ['done'])
                 target_nums_to_remove.append(targ_num+1)
 
