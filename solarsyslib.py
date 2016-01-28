@@ -424,6 +424,7 @@ class TargetListPlanetsAndMoons(object):
         """
         #        day = datetime.datetime(2015,11,7) # for KP, in UTC it is always 'tomorrow'
         nextDay = day + datetime.timedelta(days=1)
+        # print(nextDay)
         astrot = Time([str(day), str(nextDay)], format='iso', scale='utc')
         # when the night comes, heh?
         sunSet = self.observatory.sun_set_time(astrot[0])
@@ -435,6 +436,7 @@ class TargetListPlanetsAndMoons(object):
         # build time grid for the night to come
         time_grid = time_grid_from_range(night)
         middle_of_night = time_grid[len(time_grid) / 2]
+        # print(middle_of_night.datetime)
 
         return night, middle_of_night
 
@@ -488,7 +490,8 @@ class TargetListPlanetsAndMoons(object):
                 mag = b.mag
 
             # compute rates in arcsec/s:
-            dt = datetime.timedelta(seconds=1)
+            sec = 1
+            dt = datetime.timedelta(seconds=sec)
             b.compute(ephem.Date(t + dt))
             ra_p1 = b.a_ra*180.0/np.pi*3600.0
             dec_p1 = b.a_dec*180.0/np.pi*3600.0
@@ -496,8 +499,8 @@ class TargetListPlanetsAndMoons(object):
             ra_m1 = b.a_ra*180.0/np.pi*3600.0
             dec_m1 = b.a_dec*180.0/np.pi*3600.0
 
-            ra_rate = (ra_p1 - ra_m1)/2.0
-            dec_rate = (dec_p1 - dec_m1)/2.0
+            ra_rate = (ra_p1 - ra_m1)/(2.0*sec)
+            dec_rate = (dec_p1 - dec_m1)/(2.0*sec)
 
             print(body, ra, dec, ra_rate, dec_rate, mag)
 

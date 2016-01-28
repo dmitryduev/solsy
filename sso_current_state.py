@@ -13,10 +13,9 @@ import os
 import numpy as np
 # from numba import jit
 from copy import deepcopy
-from pypride.vintflib import pleph
 import linecache
 from astropy.time import Time
-from pypride.classes import inp_set
+from jplephem.spk import SPK
 import ephem
 import datetime
 
@@ -208,12 +207,12 @@ class Kepler(object):
         return r2000
 
     # @jit
-    def raDecVmag(self, mjd, jpl_eph, epoch='J2000', output_Vmag=True):
+    def raDecVmag(self, mjd, _kernel, epoch='J2000', output_Vmag=True):
         """ Calculate ra/dec's from equatorial state
             Then compute asteroid's expected visual magnitude
 
         :param mjd: MJD epoch in decimal days
-        :param jpl_eph: target's heliocentric equatorial
+        :param _kernel: target's heliocentric equatorial
         :param epoch: RA/Dec epoch. 'J2000' or 'Date'
         :param output_Vmag: output or not?
 
@@ -223,11 +222,15 @@ class Kepler(object):
         # J2000 ra/dec's:
         jd = mjd + 2400000.5
         # Earth:
-        rrd = pleph(jd, 3, 12, jpl_eph)
-        earth = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
+        r, v = _kernel[0, 3].compute_and_differentiate(jd)
+        v /= 86400.0
+        earth = np.reshape(np.hstack((r, v)), (3, 2), 'F') * 1e3
+
         # Sun:
-        rrd = pleph(jd, 11, 12, jpl_eph)
-        sun = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
+        r, v = _kernel[0, 10].compute_and_differentiate(jd)
+        v /= 86400.0
+        sun = np.reshape(np.hstack((r, v)), (3, 2), 'F') * 1e3
+
         # target state:
         state = self.ecliptic_to_equatorial(self.to_cart(mjd))
 
@@ -235,12 +238,14 @@ class Kepler(object):
         # LT-correction:
         C = 299792458.0
         lt = np.linalg.norm(earth[:, 0] - (sun[:, 0] + state[:, 0])) / C
-        #        print(lt)
+        # print(lt)
 
         # recompute:
         # Sun:
-        rrd = pleph(jd - lt / 86400.0, 11, 12, jpl_eph)
-        sun = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
+        r, v = _kernel[0, 10].compute_and_differentiate(jd - lt / 86400.0)
+        v /= 86400.0
+        sun = np.reshape(np.hstack((r, v)), (3, 2), 'F') * 1e3
+
         # target state:
         state = self.ecliptic_to_equatorial(self.to_cart(mjd - lt / 86400.0))
 
@@ -316,11 +321,12 @@ class Kepler(object):
         return [ra, dec], [ra_dot, dec_dot], Vmag
 
 
-def get_asteroid_state(target, mjd, jpl_eph):
+def get_asteroid_state(target, mjd, _kernel):
     """ Compute obs parameters for a given t
 
     :param target: Kepler class object
     :param mjd: epoch in TDB/mjd (t.tdb.mjd, t - astropy.Time object, UTC)
+    :param _kernel: DE SPK kernel
     :return: radec in rad, radec_dot in arcsec/s, Vmag
     """
 
@@ -341,7 +347,7 @@ def get_asteroid_state(target, mjd, jpl_eph):
     asteroid = Kepler(a, e, i, w, Node, M0, GSUN, t0, H, G)
 
     # jpl_eph - path to eph used by pypride
-    radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, jpl_eph, output_Vmag=False)
+    radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, _kernel=_kernel, output_Vmag=False)
 
     return radec, radec_dot, Vmag
 
@@ -367,17 +373,17 @@ def asteroid_data_load(_f_database, asteroid_name):
                                tuple(map(float, l[25:].split()[:-2])))], dtype=dt)
 
 
-def get_current_state_asteroid(_asteroid, _inp):
+def get_current_state_asteroid(_asteroid, _kernel):
     """
     :param _asteroid:
+    :param _kernel: DE421 SPK kernel
     :return:
      current J2000 ra/dec of a moving object
      current J2000 ra/dec rates of a moving object
      if mag <= self.m_lim
     """
 
-    radec, radec_dot, _ = get_asteroid_state(_asteroid,
-                                             Time.now().tdb.mjd, _inp['jpl_eph'])
+    radec, radec_dot, _ = get_asteroid_state(_asteroid, Time.now().tdb.mjd, _kernel)
 
     # reformat
     ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
@@ -480,15 +486,17 @@ if __name__ == '__main__':
             raise SystemExit
 
         try:
-            f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
-            inp = inp_set(f_inp).get_section('all')
+            # init jplephem:
+            f_spk = 'eph/de421.bsp'
+            kernel = SPK.open(f_spk)
         except Exception:
             # print error code 3 (failed to load JPL DE ephemeris) and exit
             print(3, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
             raise SystemExit
 
         try:
-            ra, dec, ra_rate, dec_rate = get_current_state_asteroid(_asteroid=asteroid, _inp=inp)
+            ra, dec, ra_rate, dec_rate = get_current_state_asteroid(_asteroid=asteroid,
+                                                                    _kernel=kernel)
             print(0, ra, dec, ra_rate, dec_rate)
         except Exception:
             # print error code 4 (calculation failed) and exit

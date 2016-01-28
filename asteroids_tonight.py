@@ -47,7 +47,7 @@ if __name__ == '__main__':
     ''' target list [no limits on Vmag] '''
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
     now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
-    today = datetime.datetime(now.year, now.month, now.day)
+    today = datetime.datetime(now.year, now.month, now.day+1)
 
     tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=16)
     targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     ''' make/change XML files '''
     path = '/Users/dmitryduev/web/qserv/operation'
     program_number = 4
-    txml = TargetXML(path=path, program_number=program_number, server='http://localhost:8080')
+    txml = TargetXML(path=path, program_number=program_number, server='http://localhost:8081')
     # dump 'em targets!
     txml.dumpTargets(targets, epoch='J2000')
 
