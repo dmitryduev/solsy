@@ -18,6 +18,7 @@ from astropy.time import Time
 from jplephem.spk import SPK
 import ephem
 import datetime
+import urllib2
 
 # from asterlib import TargetListAsteroids, TargetXML
 
@@ -352,6 +353,34 @@ def get_asteroid_state(target, mjd, _kernel):
     return radec, radec_dot, Vmag
 
 
+def asteroid_database_update(_f_database, n=1):
+    """ Fetch a database update from JPL
+
+    :param _f_database:
+    :param n: days old
+    :return:
+    """
+    do_update = False
+    if os.path.isfile(_f_database):
+        age = datetime.datetime.now() - \
+              datetime.datetime.utcfromtimestamp(os.path.getmtime(_f_database))
+        if age.days > n:
+            do_update = True
+            # print('Asteroid database: {:s} is out of date, updating...'.format(_f_database))
+    else:
+        do_update = True
+        # print('Database file: {:s} is missing, fetching...'.format(_f_database))
+    # if the file is older than n days:
+    if do_update:
+        try:
+            response = urllib2.urlopen('http://ssd.jpl.nasa.gov/dat/ELEMENTS.NUMBR')
+            with open(_f_database, 'w') as f:
+                f.write(response.read())
+        except Exception, err:
+            # print(str(err))
+            pass
+
+
 def asteroid_data_load(_f_database, asteroid_name):
     """ Load data from JPL database
 
@@ -359,6 +388,9 @@ def asteroid_data_load(_f_database, asteroid_name):
     :param asteroid_name:
     :return:
     """
+
+    # update database if necessary:
+    asteroid_database_update(_f_database)
 
     asteroid_number = int(asteroid_name.split(' ')[0])
 
@@ -388,7 +420,11 @@ def get_current_state_asteroid(_asteroid, _kernel):
     # reformat
     ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
     dec = dms(radec[1])
-    dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
+    # fix zero padding for dec
+    if dec[0] >= 0:
+        dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
+    else:
+        dec = '{:03.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
     ''' !!! NOTE: ra rate must be with a minus sign !!! '''
     ra_rate = '{:.5f}'.format(-radec_dot[0])
     dec_rate = '{:.5f}'.format(radec_dot[1])
@@ -427,8 +463,15 @@ def get_current_state_planet_or_moon(body):
     exec('b = ephem.{:s}()'.format(body.title()))
     b.compute(ephem.Date(t), epoch='2000')
 
-    ra = b.a_ra
-    dec = b.a_dec
+    # fix zero padding
+    ra = str(b.a_ra)
+    if ra.index(':') == 1:
+        ra = '0' + ra
+    dec = str(b.a_dec)
+    if dec.index(':') == 1:
+        dec = '0' + dec
+    elif dec.index(':') == 2 and dec[0] == '-':
+        dec = '-0' + dec[1:]
 
     # compute rates in arcsec/s:
     dt = datetime.timedelta(seconds=1)
