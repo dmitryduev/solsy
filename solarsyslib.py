@@ -113,7 +113,7 @@ def is_multiple_asteroid(name, _f_base='multiples-names.txt'):
     :return:
     """
     try:
-        number = int(name.split(' ')[0])
+        number = int(name.split('_')[0])
     except Exception, err:
         print(str(err))
         print('could not get the asteroid number.')
@@ -572,7 +572,7 @@ class TargetListAsteroids(object):
          current J2000 ra/dec rates of a moving object
          if mag <= self.m_lim
         """
-        number = int(name.split(' ')[0])
+        number = int(name.split('_')[0])
         asteroid = self.database[number-1]
 
         radec, radec_dot, _ = self.getObsParams(asteroid, Time.now().tdb.mjd)
@@ -915,6 +915,9 @@ class TargetXML(object):
             else:
                 name = '{:s}'.format(target[0]['name'])
 
+            # no spaces, please :(
+            name = name.replace(' ', '_')
+
             # update existing xml file
             if targetNames is not None and name in targetNames:
                 # print(name)
@@ -1044,7 +1047,8 @@ class TargetXML(object):
                                                '%Y-%m-%d %H:%M:%S.%f')
             # updated > 2 days ago?
             if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
-                    and targ['done'] == '0' and targ['Object']['Observation']['repeated'] == '0':
+                    and targ['done'] == '0' \
+                    and targ['Object'][0]['Observation'][0]['repeated'] == '0':
                 # print(targ['comment'], targ['done'])
                 target_nums_to_remove.append(targ_num+1)
 

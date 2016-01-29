@@ -22,7 +22,7 @@ import pytz
 if __name__ == '__main__':
     # asteroid database:
     path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
-    f_database = os.path.join(path_to_database, 'ELEMENTS.numbr')
+    f_database = os.path.join(path_to_database, 'ELEMENTS.NUMBR')
 
     f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
 

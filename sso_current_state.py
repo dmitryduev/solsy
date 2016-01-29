@@ -392,7 +392,7 @@ def asteroid_data_load(_f_database, asteroid_name):
     # update database if necessary:
     asteroid_database_update(_f_database)
 
-    asteroid_number = int(asteroid_name.split(' ')[0])
+    asteroid_number = int(asteroid_name.split('_')[0])
 
     l = linecache.getline(_f_database, asteroid_number+2)
 
@@ -518,7 +518,7 @@ if __name__ == '__main__':
         ''' asteroids '''
         # asteroid database:
         path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
-        f_database = os.path.join(path_to_database, 'ELEMENTS.numbr')
+        f_database = os.path.join(path_to_database, 'ELEMENTS.NUMBR')
 
         try:
             asteroid = asteroid_data_load(_f_database=f_database, asteroid_name=name)
@@ -546,10 +546,6 @@ if __name__ == '__main__':
             print(4, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)
             raise SystemExit
 
-        # tl = TargetListAsteroids(f_database, f_inp)
-        # ra, dec, ra_rate, dec_rate = tl.get_current_state(name)
-
-        # print(ra, dec, ra_rate, dec_rate)
     else:
         ''' planets and moons '''
         try:
