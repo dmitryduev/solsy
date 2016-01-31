@@ -15,29 +15,48 @@ import numpy as np
 import datetime
 from astropy.table import Table
 from astropy import units as u
-from solarsyslib import TargetListAsteroids, TargetXML, get_guide_star
+from solarsyslib import TargetListAsteroids, TargetXML, \
+                        get_guide_star, asteroid_multiples_numbers
 import pytz
+import ConfigParser
+import inspect
+import argparse
 
 
 if __name__ == '__main__':
+    # create parser
+    parser = argparse.ArgumentParser(prog='asteroids_toonight.py',
+                    formatter_class=argparse.RawDescriptionHelpFormatter,
+                    description='Create nightly target list for the asteroids program.')
+    # optional arguments
+    parser.add_argument('-m', '--multiples', action='store_true',
+                        help='process only known multiples')
+    # positional arguments
+    # parser.add_argument('name', type=str, help='object name')
+
+    # a parser exception (e.g. if no argument was given) will be caught
+    args = parser.parse_args()
+
+    # load config data
+    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
+    config = ConfigParser.RawConfigParser()
+    config.read(os.path.join(abs_path, 'config.ini'))
+
     # asteroid database:
-    path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
+    # path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
+    path_to_database = config.get('Path', 'asteroid_database_path')
     f_database = os.path.join(path_to_database, 'ELEMENTS.NUMBR')
 
-    f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
+    # f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
+    f_inp = config.get('Path', 'pypride_inp')
 
     # process all or only known multiples?
-    do = 'all'
-
-    if do != 'all':
+    if args.multiples:
         ''' known main-belt multiples '''
         # triples:
         # 45 Eugenia, 87 Sylvia, 93 Minerva, 130 Elektra, 216 Kleopatra, 3749 Balam
         # all known multiples
-        with open('/Users/dmitryduev/_caltech/roboao/asteroids/multiples.txt') as f:
-            f_lines = f.readlines()
-        multiples_num = np.array([int(l.split()[0].replace('(', '').replace(')', ''))
-                                  for l in f_lines])
+        multiples_num = asteroid_multiples_numbers()
         # mask by asteroid number:
         mask = multiples_num - 1
     else:
@@ -47,7 +66,7 @@ if __name__ == '__main__':
     ''' target list [no limits on Vmag] '''
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
     now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
-    today = datetime.datetime(now.year, now.month, now.day+1)
+    today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
     tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=16)
     targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
@@ -66,11 +85,15 @@ if __name__ == '__main__':
             guide = get_guide_star(dim_targets_table, chunk=29, ang_sep='33s')
 
     ''' make/change XML files '''
-    path = '/Users/dmitryduev/web/qserv/operation'
-    program_number = 4
-    txml = TargetXML(path=path, program_number=program_number, server='http://localhost:8081')
+    path = config.get('Path', 'program_path')
+    program_number = config.get('Path', 'program_number_asteroids')
+
+    txml = TargetXML(path=path, program_number=program_number,
+                     server=config.get('Path', 'queue_server'))
     # dump 'em targets!
     txml.dumpTargets(targets, epoch='J2000')
+
+    print('Succesfully updated the target list via the website')
 
     # clean up the target list - remove unobserved, which are not suitable anymore:
     txml.clean_target_list()

@@ -19,8 +19,8 @@ from jplephem.spk import SPK
 import ephem
 import datetime
 import urllib2
-
-# from asterlib import TargetListAsteroids, TargetXML
+import inspect
+import ConfigParser
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -163,7 +163,7 @@ class Kepler(object):
         """
         # transformation matrix
         eps = 23.439279444444444 * np.pi / 180.0
-        #        eps = 23.43929111*np.pi/180.0
+        # eps = 23.43929111*np.pi/180.0
         R = np.array([[1.0, 0.0, 0.0],
                       [0.0, np.cos(eps), -np.sin(eps)],
                       [0.0, np.sin(eps), np.cos(eps)]])
@@ -489,10 +489,15 @@ def get_current_state_planet_or_moon(body):
 
 
 if __name__ == '__main__':
+    # load config data
+    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
+    config = ConfigParser.RawConfigParser()
+    config.read(os.path.join(abs_path, 'config.ini'))
+
     # create parser
     parser = ArgumentParser(prog='sso_current_state.py',
-                    formatter_class=argparse.RawDescriptionHelpFormatter,
-                    description='Get current state of a Solar system object.')
+                            formatter_class=argparse.RawDescriptionHelpFormatter,
+                            description='Get current state of a Solar system object.')
     # optional arguments
     # parser.add_argument('-p', '--parallel', action='store_true',
     #                     help='run computation in parallel mode')
@@ -507,7 +512,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     name = args.name
-    # print(name)
+
     # a priori coordinates
     ra_apr = args.ra_apr
     dec_apr = args.dec_apr
@@ -517,7 +522,7 @@ if __name__ == '__main__':
     if not is_planet_or_moon(name):
         ''' asteroids '''
         # asteroid database:
-        path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
+        path_to_database = config.get('Path', 'asteroid_database_path')
         f_database = os.path.join(path_to_database, 'ELEMENTS.NUMBR')
 
         try:
@@ -530,7 +535,7 @@ if __name__ == '__main__':
 
         try:
             # init jplephem:
-            f_spk = 'eph/de421.bsp'
+            f_spk = config.get('Path', 'jpl_ephem_spk_kernel')
             kernel = SPK.open(f_spk)
         except Exception:
             # print error code 3 (failed to load JPL DE ephemeris) and exit
@@ -550,7 +555,7 @@ if __name__ == '__main__':
         ''' planets and moons '''
         try:
             ra, dec, ra_rate, dec_rate = get_current_state_planet_or_moon(name)
-            print(0, ra, dec, ra_rate, dec_rate)
+            print(0, ra, dec, '{:.5f}'.format(ra_rate), '{:.5f}'.format(dec_rate))
         except Exception:
             # print error code 4 (calculation failed) and exit
             print(4, ra_apr, dec_apr, ra_rate_apr, dec_rate_apr)

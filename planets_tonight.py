@@ -16,23 +16,32 @@ for the Robo-AO queue
 import datetime
 from solarsyslib import TargetListPlanetsAndMoons, TargetXML
 import pytz
-
+import os
+import inspect
+import ConfigParser
 
 if __name__ == '__main__':
-    f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
+    # load config data
+    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
+    config = ConfigParser.RawConfigParser()
+    config.read(os.path.join(abs_path, 'config.ini'))
+
+    f_inp = config.get('Path', 'pypride_inp')
 
     ''' target list [no limits on Vmag] '''
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
     now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
-    today = datetime.datetime(now.year, now.month, now.day+1)
+    today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
     tl = TargetListPlanetsAndMoons(f_inp, _observatory='kitt peak', _m_lim=16)
     # tl.target_list_all(today)
     targets = tl.target_list_observable(tl.target_list_all(today), today)
 
     ''' make/change XML files '''
-    path = '/Users/dmitryduev/web/qserv/operation'
-    program_number = 24
-    txml = TargetXML(path=path, program_number=program_number, server='http://localhost:8081')
+    path = config.get('Path', 'program_path')
+    program_number = config.get('Path', 'program_number_planets')
+    txml = TargetXML(path=path, program_number=program_number,
+                     server=config.get('Path', 'queue_server'))
     # dump 'em targets!
     txml.dumpTargets(targets, epoch='J2000')
+    print('Succesfully updated the target list via the website')
