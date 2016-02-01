@@ -1173,8 +1173,14 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                # planet or moon?
                 if is_planet_or_moon(name):
                     xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
+                    # since we want to observe them every night,
+                    # we need to force the queue to do so
+                    xml['done'] = 0
+                    xml['Object'][0]['done'] = 0
+                    xml['Object'][0]['Observation'][0]['done'] = 0
                 xml['Object'][0]['Observation'][0]['camera_mode'] = \
                     '{:s}'.format(getModefromMag(target[4]))
 
@@ -1205,8 +1211,14 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                # planet or moon?
                 if is_planet_or_moon(name):
                     xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
+                    # since we want to observe them every night,
+                    # we need to force the queue to do so
+                    xml['done'] = 0
+                    xml['Object'][0]['done'] = 0
+                    xml['Object'][0]['Observation'][0]['done'] = 0
                 xml['Object'][0]['Observation'][0]['camera_mode'] = \
                     '{:s}'.format(getModefromMag(target[4]))
 

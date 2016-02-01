@@ -35,7 +35,8 @@ if __name__ == '__main__':
 
     tl = TargetListPlanetsAndMoons(f_inp, _observatory='kitt peak', _m_lim=16)
     # tl.target_list_all(today)
-    targets = tl.target_list_observable(tl.target_list_all(today), today)
+    targets = tl.target_list_observable(tl.target_list_all(today), today,
+                                        fraction=0.05)
 
     ''' make/change XML files '''
     path = config.get('Path', 'program_path')
