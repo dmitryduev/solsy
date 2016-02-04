@@ -1295,7 +1295,6 @@ class TargetXML(object):
                 # print(targ['comment'], targ['done'])
                 target_nums_to_remove.append(targ_num+1)
 
-        # TODO: add try/except clause + check server status (should be 200 - OK)
         # now remove the xml files. start from end not to scoop numbering
         if len(target_nums_to_remove) > 0:
             try:

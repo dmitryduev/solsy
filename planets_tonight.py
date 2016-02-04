@@ -46,3 +46,6 @@ if __name__ == '__main__':
     # dump 'em targets!
     txml.dumpTargets(targets, epoch='J2000')
     print('Succesfully updated the target list via the website')
+
+    # clean up the target list - remove unobserved, which are not suitable anymore:
+    txml.clean_target_list()
