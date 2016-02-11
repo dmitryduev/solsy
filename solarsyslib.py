@@ -1287,8 +1287,13 @@ class TargetXML(object):
                             obj['Observation'].append(obs)
                     targ['Object'].append(obj)
 
-            t_xml = datetime.datetime.strptime(' '.join(targ['comment'].split()[-2:]),
-                                               '%Y-%m-%d %H:%M:%S.%f')
+            try:
+                # TODO: the queue software does not like spaces even in comments
+                t_xml = datetime.datetime.strptime(' '.join(targ['comment'].split()[-2:]),
+                                                   '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                # why not?
+                t_xml = datetime.datetime.now() - datetime.timedelta(days=1)
             # updated > 2 days ago?
             if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
                     and targ['done'] == '0' \
