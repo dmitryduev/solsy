@@ -10,6 +10,7 @@ for the Robo-AO queue
 
 """
 
+from __future__ import print_function
 import os
 import numpy as np
 import datetime
@@ -25,9 +26,9 @@ import argparse
 
 if __name__ == '__main__':
     # create parser
-    parser = argparse.ArgumentParser(prog='asteroids_toonight.py',
-                    formatter_class=argparse.RawDescriptionHelpFormatter,
-                    description='Create nightly target list for the asteroids program.')
+    parser = argparse.ArgumentParser(prog='asteroids_tonight.py',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description='Create nightly target list for the asteroids program.')
     # optional arguments
     parser.add_argument('-m', '--multiples', action='store_true',
                         help='process only known multiples')
@@ -43,11 +44,9 @@ if __name__ == '__main__':
     config.read(os.path.join(abs_path, 'config.ini'))
 
     # asteroid database:
-    # path_to_database = '/Users/dmitryduev/_caltech/roboao/asteroids/'
     path_to_database = config.get('Path', 'asteroid_database_path')
     f_database = os.path.join(path_to_database, 'ELEMENTS.NUMBR')
 
-    # f_inp = '/Users/dmitryduev/_jive/pypride/src/pypride/inp.cfg'
     f_inp = config.get('Path', 'pypride_inp')
 
     # process all or only known multiples?
@@ -91,9 +90,34 @@ if __name__ == '__main__':
     txml = TargetXML(path=path, program_number=program_number,
                      server=config.get('Path', 'queue_server'))
     # dump 'em targets!
-    txml.dumpTargets(targets, epoch='J2000')
+    c = txml.dumpTargets(targets, epoch='J2000')
 
-    print('Succesfully updated the target list via the website')
+    if c is None:
+        print('Successfully updated the target list via the website')
 
-    # clean up the target list - remove unobserved, which are not suitable anymore:
-    txml.clean_target_list()
+        # clean up the target list - remove unobserved, which are not suitable anymore:
+        txml.clean_target_list()
+
+    # go for high priority asteroids:
+    asteroid_hp_num = np.array(map(int, config.get('HP', 'asteroids_hp').split(',')))
+
+    # mask by asteroid number:
+    mask = asteroid_hp_num - 1
+
+    tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=17.5)
+    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
+
+    ''' make/change XML files '''
+    path = config.get('Path', 'program_path')
+    program_number = config.get('Path', 'program_number_asteroids_hp')
+
+    txml = TargetXML(path=path, program_number=program_number,
+                     server=config.get('Path', 'queue_server'))
+    # dump 'em targets!
+    c = txml.dumpTargets(targets, epoch='J2000')
+
+    if c is None:
+        print('Successfully updated the target list via the website')
+
+        # clean up the target list - remove unobserved, which are not suitable anymore:
+        txml.clean_target_list()

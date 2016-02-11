@@ -5,6 +5,12 @@ Report
 @autor: Dr Dmitry A. Duev [Caltech]
 
 
+Run like this:
+python sso_current_state.py -- '3_Juno' 14:53:23.481 -08:02:0.600 -0.00595 0.00129
+
+* a double minus is used to tell the parser not to look for optional arguments
+* not to confuse it with a possible negative ra/dec/[rate] value
+
 """
 
 from __future__ import print_function

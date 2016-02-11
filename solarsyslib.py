@@ -1255,6 +1255,7 @@ class TargetXML(object):
                     print('server error')
         except Exception:
             print('failed to connect to the website.')
+            return 1
 
     def clean_target_list(self):
         pnot = len([_f for _f in os.listdir(self.path)

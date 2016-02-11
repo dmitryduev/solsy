@@ -44,8 +44,9 @@ if __name__ == '__main__':
     txml = TargetXML(path=path, program_number=program_number,
                      server=config.get('Path', 'queue_server'))
     # dump 'em targets!
-    txml.dumpTargets(targets, epoch='J2000')
-    print('Succesfully updated the target list via the website')
+    c = txml.dumpTargets(targets, epoch='J2000')
+    if c is None:
+        print('Successfully updated the target list via the website')
 
-    # clean up the target list - remove unobserved, which are not suitable anymore:
-    txml.clean_target_list()
+        # clean up the target list - remove unobserved, which are not suitable anymore:
+        txml.clean_target_list()
