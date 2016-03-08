@@ -23,7 +23,7 @@ from time import time as _time
 
 import multiprocessing
 import numpy as np
-from astroplan import Observer
+from astroplan import Observer, FixedTarget
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
@@ -675,7 +675,7 @@ class TargetListPlanetsAndMoons(object):
             from self.database
         """
         # get middle of night:
-        _, middle_of_night = self.middle_of_night(day)
+        night, middle_of_night = self.middle_of_night(day)
         # mjd = middle_of_night.tdb.mjd  # in TDB!!
         t = middle_of_night.datetime
         # print(t)
@@ -733,8 +733,20 @@ class TargetListPlanetsAndMoons(object):
 
             print(body, ra, dec, ra_rate, dec_rate, mag)
 
-            target_list.append([{'name': body}, middle_of_night,
-                                [ra, dec], [ra_rate, dec_rate], mag])
+            # calculate meridian transit time to set hour angle limit.
+            # no need to observe a planet when it's low if can wait until it's high.
+            # get next transit after night start:
+            meridian_transit_time = self.observatory.target_meridian_transit_time(night[0],
+                                        FixedTarget(coord=SkyCoord(ra=ra*u.rad, dec=dec*u.rad),
+                                        name=body.title()), which='next')
+
+            # will it happen during the night?
+            meridian_transit = night[0] <= meridian_transit_time <= night[1]
+            # print(night[0] <= meridian_transit_time <= night[1])
+            # print(night[0], meridian_transit_time.iso, night[1], '\n')
+
+            target_list.append([{'name': body.title()}, middle_of_night,
+                                [ra, dec], [ra_rate, dec_rate], mag, meridian_transit])
 
         return np.array(target_list)
 
@@ -1074,48 +1086,105 @@ class TargetXML(object):
         return targetNames
 
     @staticmethod
-    def dummyXML(program_number=-1):
+    def dummyXML(program_number=-1, obj='asteroid'):
         """
 
         :param program_number:
+        :param obj: 'asteroid' or 'ploon'
         :return:
         """
-        return OrderedDict([('program_number', program_number),
-                            ('number', ''),
-                            ('name', ''),
-                            ('visited_times_for_completion', 3),
-                            # ('seeing_limit', ''),
-                            ('visited_times', 0),
-                            ('done', 0),
-                            ('cadence', 0),
-                            ('comment', 'None'),
-                            ('time_critical_flag', 0),
-                            ('Object',
-                             [OrderedDict([('number', 1),
-                                           ('RA', ''),
-                                           ('dec', ''),
-                                           ('ra_rate', ''),
-                                           ('dec_rate', ''),
-                                           ('epoch', '2000.0'),
-                                           ('magnitude', ''),
-                                           ('solar_system', 1),
-                                           # ('sun_altitude_limit', ''),
-                                           # ('moon_phase_window', ''),
-                                           # ('airmass_limit', ''),
-                                           # ('sun_distance_limit', ''),
-                                           # ('moon_distance_limit', ''),
-                                           # ('sky_brightness_limit', ''),
-                                           # ('hour_angle_limit', ''),
-                                           ('done', 0),
-                                           ('Observation',
-                                            [OrderedDict([('number', 1),
-                                                          ('exposure_time', 90),
-                                                          ('ao_flag', 1),
-                                                          ('filter_code', 'FILTER_LONGPASS_600'),
-                                                          ('camera_mode', ''),
-                                                          ('repeat_times', 1),
-                                                          ('repeated', 0),
-                                                          ('done', 0)])])])])])
+
+        if obj == 'asteroid':
+            return OrderedDict([('program_number', program_number),
+                                ('number', ''),
+                                ('name', ''),
+                                ('visited_times_for_completion', 3),
+                                # ('seeing_limit', ''),
+                                ('visited_times', 0),
+                                ('done', 0),
+                                ('cadence', 0),
+                                ('comment', 'None'),
+                                ('time_critical_flag', 0),
+                                ('Object',
+                                 [OrderedDict([('number', 1),
+                                               ('RA', ''),
+                                               ('dec', ''),
+                                               ('ra_rate', ''),
+                                               ('dec_rate', ''),
+                                               ('epoch', '2000.0'),
+                                               ('magnitude', ''),
+                                               ('solar_system', 1),
+                                               # ('sun_altitude_limit', ''),
+                                               # ('moon_phase_window', ''),
+                                               # ('airmass_limit', ''),
+                                               # ('sun_distance_limit', ''),
+                                               # ('moon_distance_limit', ''),
+                                               # ('sky_brightness_limit', ''),
+                                               # ('hour_angle_limit', ''),
+                                               ('done', 0),
+                                               ('Observation',
+                                                [OrderedDict([('number', 1),
+                                                              ('exposure_time', 90),
+                                                              ('ao_flag', 1),
+                                                              ('filter_code', 'FILTER_LONGPASS_600'),
+                                                              ('camera_mode', ''),
+                                                              ('repeat_times', 1),
+                                                              ('repeated', 0),
+                                                              ('done', 0)])])])])])
+        else:
+            return OrderedDict([('program_number', program_number),
+                                ('number', ''),
+                                ('name', ''),
+                                ('visited_times_for_completion', 300),
+                                # ('seeing_limit', ''),
+                                ('visited_times', 0),
+                                ('done', 0),
+                                ('cadence', 0),
+                                ('comment', 'None'),
+                                ('time_critical_flag', 0),
+                                ('Object',
+                                 [OrderedDict([('number', 1),
+                                               ('RA', ''),
+                                               ('dec', ''),
+                                               ('ra_rate', ''),
+                                               ('dec_rate', ''),
+                                               ('epoch', '2000.0'),
+                                               ('magnitude', ''),
+                                               ('solar_system', 1),
+                                               # ('sun_altitude_limit', ''),
+                                               # ('moon_phase_window', ''),
+                                               # ('airmass_limit', ''),
+                                               # ('sun_distance_limit', ''),
+                                               # ('moon_distance_limit', ''),
+                                               # ('sky_brightness_limit', ''),
+                                               # ('hour_angle_limit', ''),
+                                               ('done', 0),
+                                               ('Observation',
+                                                [OrderedDict([('number', 1),
+                                                              ('exposure_time', 60),
+                                                              ('ao_flag', 1),
+                                                              ('filter_code', 'FILTER_SLOAN_I'),
+                                                              ('camera_mode', ''),
+                                                              ('repeat_times', 1),
+                                                              ('repeated', 0),
+                                                              ('done', 0)]),
+                                                 OrderedDict([('number', 2),
+                                                              ('exposure_time', 20),
+                                                              ('ao_flag', 1),
+                                                              ('filter_code', 'FILTER_SLOAN_G'),
+                                                              ('camera_mode', ''),
+                                                              ('repeat_times', 1),
+                                                              ('repeated', 0),
+                                                              ('done', 0)]),
+                                                 OrderedDict([('number', 3),
+                                                              ('exposure_time', 20),
+                                                              ('ao_flag', 1),
+                                                              ('filter_code', 'FILTER_SLOAN_R'),
+                                                              ('camera_mode', ''),
+                                                              ('repeat_times', 1),
+                                                              ('repeated', 0),
+                                                              ('done', 0)])
+                                                 ])])])])
 
     def dumpTargets(self, targets, epoch='J2000'):
         """ Dump target list
@@ -1141,7 +1210,7 @@ class TargetXML(object):
         for target in targets:
             # if not is_planet_or_moon(target[0]['name']):
             # asteroid or planet?
-            if type(target[0]) != type({}) and 'num' in target[0].dtype.names:
+            if not isinstance(target[0], dict) and 'num' in target[0].dtype.names:
                 name = '{:d} {:s}'.format(target[0]['num'], target[0]['name'])
             else:
                 name = '{:s}'.format(target[0]['name'])
@@ -1175,21 +1244,33 @@ class TargetXML(object):
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
                 # planet or moon?
                 if is_planet_or_moon(name):
-                    xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
+                    # set hour angle limit if target crosses meridian during the night:
+                    if target[-1]:
+                        xml['Object'][0]['hour_angle_limit'] = '0.5'
+                    else:
+                        xml['Object'][0]['hour_angle_limit'] = ''
+                    # set up correct filters:
+                    # xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                     # since we want to observe them every night,
                     # we need to force the queue to do so
                     xml['done'] = 0
                     xml['Object'][0]['done'] = 0
-                    xml['Object'][0]['Observation'][0]['done'] = 0
-                xml['Object'][0]['Observation'][0]['camera_mode'] = \
-                    '{:s}'.format(getModefromMag(target[4]))
+                    for ii, _ in enumerate(xml['Object'][0]['Observation']):
+                        xml['Object'][0]['Observation'][ii]['done'] = 0
+                for ii, _ in enumerate(xml['Object'][0]['Observation']):
+                    xml['Object'][0]['Observation'][ii]['camera_mode'] = \
+                        '{:s}'.format(getModefromMag(target[4]))
 
                 target_xml_path = os.path.join(self.path, targetNames[name])
             #                print target_xml_path
 
             # create a new xml file
             else:
-                xml = self.dummyXML(self.program_number)
+                if is_planet_or_moon(name):
+                    obj = 'ploon'
+                else:
+                    obj = 'asteroid'
+                xml = self.dummyXML(self.program_number, obj=obj)
                 added_target_xml_files += 1
 
                 xml['number'] = target_max_num + added_target_xml_files
@@ -1213,19 +1294,27 @@ class TargetXML(object):
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
                 # planet or moon?
                 if is_planet_or_moon(name):
-                    xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
+                    # set hour angle limit if target crosses meridian during the night:
+                    if target[-1]:
+                        xml['Object'][0]['hour_angle_limit'] = '0.5'
+                    else:
+                        xml['Object'][0]['hour_angle_limit'] = ''
+                    # set up correct filters:
+                    # xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                     # since we want to observe them every night,
                     # we need to force the queue to do so
                     xml['done'] = 0
                     xml['Object'][0]['done'] = 0
-                    xml['Object'][0]['Observation'][0]['done'] = 0
-                xml['Object'][0]['Observation'][0]['camera_mode'] = \
-                    '{:s}'.format(getModefromMag(target[4]))
+                    for ii, _ in enumerate(xml['Object'][0]['Observation']):
+                        xml['Object'][0]['Observation'][ii]['done'] = 0
+                for ii, _ in enumerate(xml['Object'][0]['Observation']):
+                    xml['Object'][0]['Observation'][ii]['camera_mode'] = \
+                        '{:s}'.format(getModefromMag(target[4]))
 
                 target_xml_path = os.path.join(self.path,
                                                'Target_{:d}.xml'.format(max_xml_num +
                                                                         added_target_xml_files))
-            #                print target_xml_path
+            # print target_xml_path
 
             # build an xml-file:
             target_xml = dicttoxml(xml, custom_root='Target', attr_type=False)
@@ -1241,7 +1330,16 @@ class TargetXML(object):
             target_xml = [t for t in target_xml if 'item>' not in t \
                           and '/>' not in t]
 
-            #                print target_xml
+            ind_obs_start = [i for i, v in enumerate(target_xml) if '<Observation>' in v]
+            ind_obs_stop = [i for i, v in enumerate(target_xml) if '</Observation>' in v]
+            for (start, stop) in zip(ind_obs_start, ind_obs_stop):
+                ind_num_obs = [i+start for i, v in enumerate(target_xml[start:stop])
+                                    if '<number>' in v]
+                if len(ind_num_obs) > 1:
+                    for ind in ind_num_obs[:0:-1]:
+                        target_xml.insert(ind, '\t\t</Observation>\n\t\t<Observation>')
+
+            # print target_xml
 
             with open(target_xml_path, 'w') as f:
                 for line in target_xml[1:-1]:
