@@ -1142,7 +1142,7 @@ class TargetXML(object):
                                                ('done', 0),
                                                ('Observation',
                                                 [OrderedDict([('number', 1),
-                                                              ('exposure_time', 90),
+                                                              ('exposure_time', 120),
                                                               ('ao_flag', 1),
                                                               ('filter_code', 'FILTER_LONGPASS_600'),
                                                               ('camera_mode', ''),
