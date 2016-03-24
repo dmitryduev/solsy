@@ -627,8 +627,9 @@ def target_list_all_helper(args):
     """
     targlist, asteroid, mjd, night = args
     radec, radec_rate, Vmag = targlist.getObsParams(asteroid, mjd)
-    meridian_transit = targlist.get_hour_angle_limit(night, radec[0], radec[1])
-    return [radec, radec_rate, Vmag, meridian_transit]
+    # meridian_transit = targlist.get_hour_angle_limit(night, radec[0], radec[1])
+    # return [radec, radec_rate, Vmag, meridian_transit]
+    return [radec, radec_rate, Vmag, False]
 
 
 class TargetListPlanetsAndMoons(object):
