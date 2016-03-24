@@ -37,7 +37,7 @@ if __name__ == '__main__':
         with open(os.path.join(program_path, xml), 'r') as f:
             f_lines = f.read()
         # print(os.path.join(program_path, xml), f_lines)
-        if (args.comment and args.comment in f_lines) or \
+        if (not args.comment and not args.name) or (args.comment and args.comment in f_lines) or \
                 (args.name and args.name in f_lines):
             f_lines = f_lines.replace('<done>1</done>', '<done>0</done>')
             # print(os.path.join(program_path, xml), f_lines)

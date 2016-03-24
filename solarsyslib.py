@@ -7,7 +7,7 @@ The Asteroids Galaxy Tour
 this is how to profile this lib:
 
 import pstats
-stats = pstats.Stats('/Users/dmitryduev/Library/Caches/PyCharm50/snapshots/aster.pstat')
+stats = pstats.Stats('/Users/dmitryduev/Library/Caches/PyCharm50/snapshots/solsy.pstat')
 stats.sort_stats('total')
 stats.print_stats(20)
 
