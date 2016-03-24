@@ -620,14 +620,15 @@ class Kepler(object):
 
 
 def target_list_all_helper(args):
-    """ Helper function to run computation in parallel
+    """ Helper function to run asteroid computation in parallel
 
     :param args:
     :return:
     """
-    targlist, asteroid, mjd = args
+    targlist, asteroid, mjd, night = args
     radec, radec_rate, Vmag = targlist.getObsParams(asteroid, mjd)
-    return [radec, radec_rate, Vmag]
+    meridian_transit = targlist.get_hour_angle_limit(night, radec[0], radec[1])
+    return [radec, radec_rate, Vmag, meridian_transit]
 
 
 class TargetListPlanetsAndMoons(object):
@@ -731,8 +732,6 @@ class TargetListPlanetsAndMoons(object):
             ra_rate = (ra_p1 - ra_m1)/(2.0*sec)
             dec_rate = (dec_p1 - dec_m1)/(2.0*sec)
 
-            print(body, ra, dec, ra_rate, dec_rate, mag)
-
             # calculate meridian transit time to set hour angle limit.
             # no need to observe a planet when it's low if can wait until it's high.
             # get next transit after night start:
@@ -744,6 +743,8 @@ class TargetListPlanetsAndMoons(object):
             meridian_transit = night[0] <= meridian_transit_time <= night[1]
             # print(night[0] <= meridian_transit_time <= night[1])
             # print(night[0], meridian_transit_time.iso, night[1], '\n')
+
+            print(body, ra, dec, ra_rate, dec_rate, mag, meridian_transit)
 
             target_list.append([{'name': body.title()}, middle_of_night,
                                 [ra, dec], [ra_rate, dec_rate], mag, meridian_transit])
@@ -805,6 +806,22 @@ class TargetListAsteroids(object):
         inp = inp_set(_f_inp)
         self.inp = inp.get_section('all')
 
+    def get_hour_angle_limit(self, night, ra, dec, name='dummy'):
+        # calculate meridian transit time to set hour angle limit.
+        # no need to observe a planet when it's low if can wait until it's high.
+        # get next transit after night start:
+        meridian_transit_time = self.observatory.\
+                                target_meridian_transit_time(night[0],
+                                      FixedTarget(coord=SkyCoord(ra=ra * u.rad,
+                                                                 dec=dec * u.rad),
+                                                  name=name.title()),
+                                      which='next')
+
+        # will it happen during the night?
+        meridian_transit = night[0] <= meridian_transit_time <= night[1]
+
+        return meridian_transit
+
     def get_current_state(self, name):
         """
         :param name:
@@ -834,7 +851,7 @@ class TargetListAsteroids(object):
             from self.database
         """
         # get middle of night:
-        _, middle_of_night = self.middle_of_night(day)
+        night, middle_of_night = self.middle_of_night(day)
         mjd = middle_of_night.tdb.mjd  # in TDB!!
         # print(middle_of_night.datetime)
         # iterate over asteroids:
@@ -850,7 +867,7 @@ class TargetListAsteroids(object):
             pool = multiprocessing.Pool(n_cpu)
             # asynchronously apply target_list_all_helper
             database_masked = self.database[mask]
-            args = [(self, asteroid, mjd) for asteroid in database_masked]
+            args = [(self, asteroid, mjd, night) for asteroid in database_masked]
             result = pool.map_async(target_list_all_helper, args)
             # close bassejn
             pool.close()  # we are not adding any more processes
@@ -868,11 +885,12 @@ class TargetListAsteroids(object):
                 # in the middle of night...
                 tic = _time()
                 radec, radec_dot, Vmag = self.getObsParams(asteroid, mjd)
+                meridian_transit = self.get_hour_angle_limit(night, radec[0], radec[1])
                 print(len(self.database)-ia, _time() - tic)
                 # skip if too dim
                 if Vmag <= self.m_lim:
                     target_list.append([asteroid, middle_of_night,
-                                        radec, radec_dot, Vmag])
+                                        radec, radec_dot, Vmag, meridian_transit])
             print('serial: {:f}'.format(_time() - ttic))
         # print('Total targets brighter than 16.5', len(target_list))
         return np.array(target_list)
@@ -1005,9 +1023,9 @@ class TargetListAsteroids(object):
 
 
 def getModefromMag(mag):
-    '''
+    """
         VICD mode depending on the object magnitude
-    '''
+    """
     m = float(mag)
     if m < 8:
         mode = '6'
@@ -1242,13 +1260,13 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                # set hour angle limit if target crosses meridian during the night:
+                if target[-1]:
+                    xml['Object'][0]['hour_angle_limit'] = '0.5'
+                else:
+                    xml['Object'][0]['hour_angle_limit'] = ''
                 # planet or moon?
                 if is_planet_or_moon(name):
-                    # set hour angle limit if target crosses meridian during the night:
-                    if target[-1]:
-                        xml['Object'][0]['hour_angle_limit'] = '0.5'
-                    else:
-                        xml['Object'][0]['hour_angle_limit'] = ''
                     # set up correct filters:
                     # xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                     # since we want to observe them every night,
@@ -1292,13 +1310,13 @@ class TargetXML(object):
                 else:
                     xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
                 xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                # set hour angle limit if target crosses meridian during the night:
+                if target[-1]:
+                    xml['Object'][0]['hour_angle_limit'] = '0.5'
+                else:
+                    xml['Object'][0]['hour_angle_limit'] = ''
                 # planet or moon?
                 if is_planet_or_moon(name):
-                    # set hour angle limit if target crosses meridian during the night:
-                    if target[-1]:
-                        xml['Object'][0]['hour_angle_limit'] = '0.5'
-                    else:
-                        xml['Object'][0]['hour_angle_limit'] = ''
                     # set up correct filters:
                     # xml['Object'][0]['Observation'][0]['filter_code'] = 'FILTER_SLOAN_I'
                     # since we want to observe them every night,
@@ -1356,6 +1374,10 @@ class TargetXML(object):
             return 1
 
     def clean_target_list(self):
+        """
+            Remove targets from the queue if it doesn't satisfy
+            observability criteria any more (and thus was not just updated)
+        """
         pnot = len([_f for _f in os.listdir(self.path)
                     if 'Target_' in _f and _f[0] != '.'])
         # iterate over target xml files
