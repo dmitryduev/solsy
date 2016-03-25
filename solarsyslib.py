@@ -16,6 +16,7 @@ stats.print_stats(20)
 from __future__ import print_function
 
 import datetime
+import pytz
 import os
 import urllib2
 from copy import deepcopy
@@ -23,16 +24,19 @@ from time import time as _time
 
 import multiprocessing
 import numpy as np
-from astroplan import Observer, FixedTarget
+# from astroplan import Observer, FixedTarget
+from astroplan import Observer as Observer_astroplan
+from astroplan import FixedTarget
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.table import vstack
 from astropy.time import Time
+from astropy.coordinates import AltAz
 from astroquery.vizier import Vizier
 from pypride.classes import inp_set
 from pypride.vintflib import pleph
-from pypride.vintlib import factorise
+from pypride.vintlib import factorise, aber_source, R_123, aber_source
 from pypride.vintlib import taitime, eop_iers, t_eph, ter2cel, \
     load_cats, sph2cart, cart2sph, iau_PNM00A
 
@@ -62,6 +66,67 @@ sns.set_context('talk')
 
 Vizier.ROW_LIMIT = -1
 Vizier.TIMEOUT = 3600
+
+
+def _target_is_vector(target):
+    if hasattr(target, '__iter__'):
+        return True
+    else:
+        return False
+
+
+# overload target meridian transit
+class Observer(Observer_astroplan):
+    def _determine_which_event(self, function, args_dict):
+        """
+        Run through the next/previous/nearest permutations of the solutions
+        to `function(time, ...)`, and return the previous/next/nearest one
+        specified by the args stored in args_dict.
+        """
+        time = args_dict.pop('time', None)
+        target = args_dict.pop('target', None)
+        which = args_dict.pop('which', None)
+        horizon = args_dict.pop('horizon', None)
+        rise_set = args_dict.pop('rise_set', None)
+        antitransit = args_dict.pop('antitransit', None)
+        N = 20
+
+        # Assemble arguments for function, depending on the function.
+        if function == self._calc_riseset:
+            args = lambda w: (time, target, w, rise_set, horizon, N)
+        elif function == self._calc_transit:
+            args = lambda w: (time, target, w, antitransit, N)
+        else:
+            raise ValueError('Function {} not supported in '
+                             '_determine_which_event.'.format(function))
+
+        if not isinstance(time, Time):
+            time = Time(time)
+
+        if which == 'next' or which == 'nearest':
+            next_event = function(*args('next'))
+            if which == 'next':
+                return next_event
+
+        if which == 'previous' or which == 'nearest':
+            previous_event = function(*args('previous'))
+            if which == 'previous':
+                return previous_event
+
+        if which == 'nearest':
+            if _target_is_vector(target):
+                return_times = []
+                for next_e, prev_e in zip(next_event, previous_event):
+                    if abs(time - prev_e) < abs(time - next_e):
+                        return_times.append(prev_e)
+                    else:
+                        return_times.append(next_e)
+                return Time(return_times)
+            else:
+                if abs(time - previous_event) < abs(time - next_event):
+                    return previous_event
+                else:
+                    return next_event
 
 
 @jit
@@ -629,7 +694,18 @@ def target_list_all_helper(args):
     radec, radec_rate, Vmag = targlist.getObsParams(asteroid, mjd)
     # meridian_transit = targlist.get_hour_angle_limit(night, radec[0], radec[1])
     # return [radec, radec_rate, Vmag, meridian_transit]
-    return [radec, radec_rate, Vmag, False]
+    return [radec, radec_rate, Vmag]
+
+
+def hour_angle_limit_helper(args):
+    """ Helper function to run hour angle limit computation in parallel
+
+    :param args:
+    :return:
+    """
+    targlist, radec, night = args
+    meridian_transit = targlist.get_hour_angle_limit2(night, radec[0], radec[1], N=20)
+    return [meridian_transit]
 
 
 class TargetListPlanetsAndMoons(object):
@@ -792,7 +868,7 @@ class TargetListAsteroids(object):
         Produce (nightly) target list for the asteroids project
     """
 
-    def __init__(self, _f_database, _f_inp, _observatory='kitt peak', _m_lim=16.5):
+    def __init__(self, _f_database, _f_inp, _observatory='kitt peak', _m_lim=16.5, date=None):
         # update database
         self.asteroid_database_update(_f_database)
         # load it to self.database:
@@ -807,21 +883,170 @@ class TargetListAsteroids(object):
         inp = inp_set(_f_inp)
         self.inp = inp.get_section('all')
 
-    def get_hour_angle_limit(self, night, ra, dec, name='dummy'):
+        ''' load eops '''
+        if date is None:
+            now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
+            date = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
+        _, _, self.eops = load_cats(self.inp, 'DUMMY', 'S', ['GEOCENTR'], date)
+
+        ''' precalc vw matrix '''
+        lat = self.observatory.location.latitude.rad
+        lon = self.observatory.location.longitude.rad
+        # Compute the local VEN-to-crust-fixed rotation matrices by rotating
+        # about the geodetic latitude and the longitude.
+        # w - rotation matrix by an angle lat_geod around the y axis
+        w = R_123(2, lat)
+        # v - rotation matrix by an angle -lon_gcen around the z axis
+        v = R_123(3, -lon)
+        # product of the two matrices:
+        self.vw = np.dot(v, w)
+
+    def get_hour_angle_limit(self, night, ra, dec):
         # calculate meridian transit time to set hour angle limit.
         # no need to observe a planet when it's low if can wait until it's high.
         # get next transit after night start:
         meridian_transit_time = self.observatory.\
                                 target_meridian_transit_time(night[0],
-                                      FixedTarget(coord=SkyCoord(ra=ra * u.rad,
-                                                                 dec=dec * u.rad),
-                                                  name=name.title()),
+                                      SkyCoord(ra=ra * u.rad, dec=dec * u.rad),
                                       which='next')
 
         # will it happen during the night?
-        meridian_transit = night[0] <= meridian_transit_time <= night[1]
+        # print('astroplan ', meridian_transit_time.iso)
+        meridian_transit = (night[0] <= meridian_transit_time <= night[1])
 
         return meridian_transit
+
+    @staticmethod
+    def _generate_24hr_grid(t0, start, end, N, for_deriv=False):
+        """
+        Generate a nearly linearly spaced grid of time durations.
+        The midpoints of these grid points will span times from ``t0``+``start``
+        to ``t0``+``end``, including the end points, which is useful when taking
+        numerical derivatives.
+        Parameters
+        ----------
+        t0 : `~astropy.time.Time`
+            Time queried for, grid will be built from or up to this time.
+        start : float
+            Number of days before/after ``t0`` to start the grid.
+        end : float
+            Number of days before/after ``t0`` to end the grid.
+        N : int
+            Number of grid points to generate
+        for_deriv : bool
+            Generate time series for taking numerical derivative (modify
+            bounds)?
+        Returns
+        -------
+        `~astropy.time.Time`
+        """
+
+        if for_deriv:
+            time_grid = np.concatenate([[start - 1 / (N - 1)],
+                                        np.linspace(start, end, N)[1:-1],
+                                        [end + 1 / (N - 1)]]) * u.day
+        else:
+            time_grid = np.linspace(start, end, N) * u.day
+
+        return t0 + time_grid
+
+    @staticmethod
+    def altaz(tt, eops, jpl_eph, vw, r_GTRS, ra, dec):
+        """
+        """
+        ''' set coordinates '''
+        K_s = np.array([np.cos(dec) * np.cos(ra),
+                        np.cos(dec) * np.sin(ra),
+                        np.sin(dec)])
+
+        azels = []
+
+        for t in tt:
+            ''' set dates: '''
+            tstamp = t.datetime
+            mjd = np.floor(t.mjd)
+            UTC = (tstamp.hour + tstamp.minute / 60.0 + tstamp.second / 3600.0) / 24.0
+            JD = mjd + 2400000.5
+
+            ''' compute tai & tt '''
+            TAI, TT = taitime(mjd, UTC)
+
+            ''' interpolate eops to tstamp '''
+            UT1, eop_int = eop_iers(mjd, UTC, eops)
+
+            ''' compute coordinate time fraction of CT day at GC '''
+            CT, dTAIdCT = t_eph(JD, UT1, TT, 0.0, 0.0, 0.0)
+
+            ''' rotation matrix IERS '''
+            r2000 = ter2cel(tstamp, eop_int, dTAIdCT, 'iau2000')
+
+            ''' do not compute displacements due to geophysical effects '''
+
+            ''' get only the velocity '''
+            v_GCRS = np.dot(r2000[:, :, 1], r_GTRS)
+
+            ''' earth position '''
+            rrd = pleph(JD + CT, 3, 12, jpl_eph)
+            earth = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
+
+            az, el = aber_source(v_GCRS, vw, K_s, r2000, earth)
+            azels.append([az, el])
+
+        return azels
+
+    def get_hour_angle_limit2(self, time, ra, dec, N=20):
+        """
+        Time at next transit of the meridian of `target`.
+        Parameters
+        ----------
+        time : `~astropy.time.Time` or other (see below)
+            Time of observation. This will be passed in as the first argument to
+            the `~astropy.time.Time` initializer, so it can be anything that
+            `~astropy.time.Time` will accept (including a `~astropy.time.Time`
+            object)
+        target : `~astropy.coordinates.SkyCoord`
+            Position of target or multiple positions of that target
+            at multiple times (if target moves, like the Sun)
+        antitransit : bool
+            Toggle compute antitransit (below horizon, equivalent to midnight
+            for the Sun)
+        location : `~astropy.coordinates.EarthLocation`
+            Location of observer
+        N : int
+            Number of altitudes to compute when searching for
+            rise or set.
+        Returns
+        -------
+        ret1 : `~astropy.time.Time`
+            Time of transit/antitransit
+        """
+        if not isinstance(time, Time):
+            time = Time(time)
+        times = self._generate_24hr_grid(time[0], 0, 1, N, for_deriv=False)
+
+        # The derivative of the altitude with respect to time is increasing
+        # from negative to positive values at the anti-transit of the meridian
+        # if antitransit:
+        #     rise_set = 'rising'
+        # else:
+        #     rise_set = 'setting'
+
+        r_GTRS = np.array(self.observatory.location.value)
+
+        altaz = self.altaz(times, self.eops, self.inp['jpl_eph'], self.vw, r_GTRS, ra, dec)
+        altitudes = np.array(altaz)[:, 1]
+        # print(zip(times.iso, altitudes*180/np.pi))
+
+        t = np.linspace(0, 1, N)
+        p = np.polyfit(t, altitudes, 6)
+        dense = np.polyval(p, np.linspace(0, 1, 200))
+        maxp = np.max(dense)
+        root = np.argmax(dense)/200.0
+        minus = np.polyval(p, maxp - 0.01)
+        plus = np.polyval(p, maxp + 0.01)
+
+        # print('pypride ', (time[0] + root * u.day).iso)
+        return (time[0] + root*u.day < time[1]) and (np.max((minus, plus)) < maxp)
 
     def get_current_state(self, name):
         """
@@ -876,25 +1101,47 @@ class TargetListAsteroids(object):
             # get the ordered results
             targets_all = result.get()
             # print(targets_all)
+            # get only the asteroids that are bright enough
             target_list = [[database_masked[_it]] + [middle_of_night] + _t
                             for _it, _t in enumerate(targets_all) if _t[2] <= self.m_lim]
-            print('parallel: {:f}'.format(_time() - ttic))
+
+            # set hour angle limit if asteroid crosses the meridian during the night
+            pool = multiprocessing.Pool(n_cpu)
+            # asynchronously apply target_list_all_helper
+            target_list = np.array(target_list)
+            args = [(self, radec, night) for (_, _, radec, _, _) in target_list]
+            result = pool.map_async(hour_angle_limit_helper, args)
+            # close bassejn
+            pool.close()  # we are not adding any more processes
+            pool.join()  # wait until all threads are done before going on
+            # get the ordered results
+            meridian_transiting_asteroids = np.array(result.get())
+            # stack the result with target_list
+            target_list = np.hstack((target_list, meridian_transiting_asteroids))
+            print('parallel computation took: {:.2f} s'.format(_time() - ttic))
         else:
             ttic = _time()
             for ia, asteroid in enumerate(self.database[mask]):
                 # print '\n', len(self.database)-ia
+                # print('\n', asteroid)
                 # in the middle of night...
-                tic = _time()
+                # tic = _time()
                 radec, radec_dot, Vmag = self.getObsParams(asteroid, mjd)
-                meridian_transit = self.get_hour_angle_limit(night, radec[0], radec[1])
-                print(len(self.database)-ia, _time() - tic)
+                # print(len(self.database)-ia, _time() - tic)
                 # skip if too dim
                 if Vmag <= self.m_lim:
+                    # ticcc = _time()
+                    # meridian_transit = self.get_hour_angle_limit(night, radec[0], radec[1])
+                    # print(_time() - ticcc, meridian_transit)
+                    # ticcc = _time()
+                    meridian_transit = self.get_hour_angle_limit2(night, radec[0], radec[1], N=20)
+                    # print(_time() - ticcc, meridian_transit)
                     target_list.append([asteroid, middle_of_night,
                                         radec, radec_dot, Vmag, meridian_transit])
-            print('serial: {:f}'.format(_time() - ttic))
+            target_list = np.array(target_list)
+            print('serial computation took: {:.2f} s'.format(_time() - ttic))
         # print('Total targets brighter than 16.5', len(target_list))
-        return np.array(target_list)
+        return target_list
 
     def target_list_observable(self, target_list, day,
                                constraints=None, fraction=0.1):
@@ -921,13 +1168,14 @@ class TargetListAsteroids(object):
         tic = _time()
         table = observability_table(constraints, self.observatory, coords,
                                     time_range=night)
-        print('observability computation took: ', _time() - tic)
+        print('observability computation took: {:.2f} s'.format(_time() - tic))
 
         # proceed with observable (for more than 5% of the night) targets only
         mask_observable = table['fraction of time observable'] > fraction
 
         target_list_observeable = target_list[mask_observable]
-        print('total bright: ', len(target_list), 'observable: ', len(target_list_observeable))
+        print('total bright asteroids: ', len(target_list),
+              'observable: ', len(target_list_observeable))
         return target_list_observeable
 
     def getObsParams(self, target, mjd):

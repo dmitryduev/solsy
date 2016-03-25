@@ -33,7 +33,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
     today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
-    tl = TargetListPlanetsAndMoons(f_inp, _observatory='kitt peak', _m_lim=16)
+    tl = TargetListPlanetsAndMoons(f_inp, _observatory='kitt peak', _m_lim=16.5)
     # tl.target_list_all(today)
     targets = tl.target_list_observable(tl.target_list_all(today), today,
                                         fraction=0.05)
