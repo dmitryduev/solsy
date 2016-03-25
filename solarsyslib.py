@@ -1004,21 +1004,14 @@ class TargetListAsteroids(object):
             the `~astropy.time.Time` initializer, so it can be anything that
             `~astropy.time.Time` will accept (including a `~astropy.time.Time`
             object)
-        target : `~astropy.coordinates.SkyCoord`
-            Position of target or multiple positions of that target
-            at multiple times (if target moves, like the Sun)
-        antitransit : bool
-            Toggle compute antitransit (below horizon, equivalent to midnight
-            for the Sun)
-        location : `~astropy.coordinates.EarthLocation`
-            Location of observer
+        ra : object RA
+        dec : object Dec
         N : int
             Number of altitudes to compute when searching for
             rise or set.
         Returns
         -------
-        ret1 : `~astropy.time.Time`
-            Time of transit/antitransit
+        ret1 : bool if target crosses the meridian or not during the night
         """
         if not isinstance(time, Time):
             time = Time(time)
