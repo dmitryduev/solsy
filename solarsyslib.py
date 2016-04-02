@@ -39,6 +39,7 @@ from pypride.vintflib import pleph
 from pypride.vintlib import factorise, aber_source, R_123, aber_source
 from pypride.vintlib import taitime, eop_iers, t_eph, ter2cel, \
     load_cats, sph2cart, cart2sph, iau_PNM00A
+from pypride.vintlib import eop_update
 
 # from astroplan import FixedTarget
 from astroplan import observability_table  # , is_observable, is_always_observable
@@ -882,6 +883,9 @@ class TargetListAsteroids(object):
         # inp file for running pypride:
         inp = inp_set(_f_inp)
         self.inp = inp.get_section('all')
+
+        # update pypride eops
+        eop_update(self.inp['cat_eop'], 3)
 
         ''' load eops '''
         if date is None:
