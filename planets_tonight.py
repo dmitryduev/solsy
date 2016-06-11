@@ -28,15 +28,29 @@ if __name__ == '__main__':
 
     f_inp = config.get('Path', 'pypride_inp')
 
+    # observatory and time zone
+    observatory = config.get('Observatory', 'observatory')
+    timezone = config.get('Observatory', 'timezone')
+
+    # observability settings:
+    # nighttime between twilights: astronomical (< -18 deg), civil (< -6 deg), nautical (< -12 deg)
+    twilight = config.get('Planets', 'twilight')
+    # fraction of night when observable given constraints:
+    fraction = float(config.get('Planets', 'fraction'))
+    # magnitude limit:
+    m_lim = float(config.get('Planets', 'm_lim'))
+    # elevation cut-off [deg]:
+    elv_lim = float(config.get('Planets', 'elv_lim'))
+
     ''' target list [no limits on Vmag] '''
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
-    now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
+    now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
-    tl = TargetListPlanetsAndMoons(f_inp, _observatory='kitt peak', _m_lim=16.5)
+    tl = TargetListPlanetsAndMoons(f_inp, _observatory=observatory, _m_lim=m_lim)
     # tl.target_list_all(today)
     targets = tl.target_list_observable(tl.target_list_all(today), today,
-                                        fraction=0.05)
+                                        elv_lim=elv_lim, twilight=twilight, fraction=fraction)
 
     ''' make/change XML files '''
     path = config.get('Path', 'program_path')

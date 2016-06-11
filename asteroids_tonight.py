@@ -49,6 +49,20 @@ if __name__ == '__main__':
 
     f_inp = config.get('Path', 'pypride_inp')
 
+    # observatory and time zone
+    observatory = config.get('Observatory', 'observatory')
+    timezone = config.get('Observatory', 'timezone')
+
+    # observability settings:
+    # nighttime between twilights: astronomical (< -18 deg), civil (< -6 deg), nautical (< -12 deg)
+    twilight = config.get('Asteroids', 'twilight')
+    # fraction of night when observable given constraints:
+    fraction = float(config.get('Asteroids', 'fraction'))
+    # magnitude limit:
+    m_lim = float(config.get('Asteroids', 'm_lim'))
+    # elevation cut-off [deg]:
+    elv_lim = float(config.get('Asteroids', 'elv_lim'))
+
     # process all or only known multiples?
     if args.multiples:
         ''' known main-belt multiples '''
@@ -64,16 +78,17 @@ if __name__ == '__main__':
 
     ''' target list [no limits on Vmag] '''
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
-    now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
+    now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
-    tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=16.5, date=today)
-    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
+    tl = TargetListAsteroids(f_database, f_inp, _observatory=observatory, _m_lim=m_lim, date=today)
+    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today,
+                                        elv_lim=elv_lim, twilight=twilight, fraction=fraction)
 
     ''' find guide stars for targets with Vmag>16.5 '''
     if 1 == 0:
         # target table for vizier:
-        dim_targets = [t for t in targets if 16.5 < t[4] < 20.5]
+        dim_targets = [t for t in targets if m_lim < t[4] < 20.5]
         dim_targets_table = [(t[2][0]*180/np.pi, t[2][1]*180/np.pi, t[4]) for t in dim_targets]
         if len(dim_targets_table) > 0:
             dim_targets_table = Table(rows=dim_targets_table,
@@ -104,7 +119,7 @@ if __name__ == '__main__':
     # mask by asteroid number:
     mask = asteroid_hp_num - 1
 
-    tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=17.5, date=today)
+    tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=16.5, date=today)
     targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
 
     ''' make/change XML files '''

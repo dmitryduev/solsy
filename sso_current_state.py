@@ -183,7 +183,7 @@ class Kepler(object):
     @staticmethod
     def PNmatrix(t, inp):
         """
-            Compute (geocentric) precession/nutation matrix for epoch
+            Compute (geocentric) IAU2000 precession/nutation matrix for epoch
             t -- astropy.time.Time object
         """
         from pypride.vintlib import taitime, eop_iers, t_eph, ter2cel, load_cats
@@ -382,7 +382,7 @@ def asteroid_database_update(_f_database, n=1):
             response = urllib2.urlopen('http://ssd.jpl.nasa.gov/dat/ELEMENTS.NUMBR')
             with open(_f_database, 'w') as f:
                 f.write(response.read())
-        except Exception, err:
+        except:  # Exception, err:
             # print(str(err))
             pass
 

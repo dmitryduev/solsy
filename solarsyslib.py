@@ -715,7 +715,6 @@ class TargetListPlanetsAndMoons(object):
     """
 
     def __init__(self, _f_inp, _observatory='kitt peak', _m_lim=16.5):
-        # TODO: add Moons support
         # observatory object
         self.observatory = Observer.at_site(_observatory)
 
@@ -830,21 +829,26 @@ class TargetListPlanetsAndMoons(object):
         return np.array(target_list)
 
     def target_list_observable(self, target_list, day,
-                               constraints=None, fraction=0.1):
+                               elv_lim=40, twilight='nautical', fraction=0.1):
         """ Check whether targets are observable and return only those
 
         :param target_list:
         :param day:
-        :param constraints:
+        :param elv_lim:
+        :param twilight:
         :param fraction:
         :return:
         """
 
         night, middle_of_night = self.middle_of_night(day)
-        if constraints is None:
-            # set constraints (above 40 deg altitude, Sun altitude < -12 deg)
-            constraints = [AltitudeConstraint(40 * u.deg, 90 * u.deg),
-                           AtNightConstraint.twilight_nautical()]
+        # set constraints (above elv_lim deg altitude, Sun altitude < -N deg [dep.on twilight])
+        constraints = [AltitudeConstraint(elv_lim * u.deg, 90 * u.deg)]
+        if twilight == 'nautical':
+            constraints.append(AtNightConstraint.twilight_nautical())
+        elif twilight == 'astronomical':
+            constraints.append(AtNightConstraint.twilight_astronomical())
+        elif twilight == 'civil':
+            constraints.append(AtNightConstraint.twilight_civil())
 
         radec = np.array(list(target_list[:, 2]))
         # tic = _time()
@@ -869,7 +873,8 @@ class TargetListAsteroids(object):
         Produce (nightly) target list for the asteroids project
     """
 
-    def __init__(self, _f_database, _f_inp, _observatory='kitt peak', _m_lim=16.5, date=None):
+    def __init__(self, _f_database, _f_inp, _observatory='kitt peak', _m_lim=16.5,
+                 date=None, timezone='America/Phoenix'):
         # update database
         self.asteroid_database_update(_f_database)
         # load it to self.database:
@@ -889,7 +894,7 @@ class TargetListAsteroids(object):
 
         ''' load eops '''
         if date is None:
-            now = datetime.datetime.now(pytz.timezone("America/Phoenix"))
+            now = datetime.datetime.now(pytz.timezone(timezone))
             date = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
         _, _, self.eops = load_cats(self.inp, 'DUMMY', 'S', ['GEOCENTR'], date)
 
@@ -1141,21 +1146,26 @@ class TargetListAsteroids(object):
         return target_list
 
     def target_list_observable(self, target_list, day,
-                               constraints=None, fraction=0.1):
+                               elv_lim=40, twilight='nautical', fraction=0.1):
         """ Check whether targets are observable and return only those
 
         :param target_list:
         :param day:
-        :param constraints:
+        :param elv_lim:
+        :param twilight:
         :param fraction:
         :return:
         """
 
         night, middle_of_night = self.middle_of_night(day)
-        if constraints is None:
-            # set constraints (above 40 deg altitude, Sun altitude < -12 deg)
-            constraints = [AltitudeConstraint(40 * u.deg, 90 * u.deg),
-                           AtNightConstraint.twilight_nautical()]
+        # set constraints (above elv_lim deg altitude, Sun altitude < -N deg [dep.on twilight])
+        constraints = [AltitudeConstraint(elv_lim * u.deg, 90 * u.deg)]
+        if twilight == 'nautical':
+            constraints.append(AtNightConstraint.twilight_nautical())
+        elif twilight == 'astronomical':
+            constraints.append(AtNightConstraint.twilight_astronomical())
+        elif twilight == 'civil':
+            constraints.append(AtNightConstraint.twilight_civil())
 
         radec = np.array(list(target_list[:, 2]))
         # tic = _time()
