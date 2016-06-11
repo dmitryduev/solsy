@@ -1491,6 +1491,8 @@ class TargetXML(object):
 
             # no spaces, please :(
             name = name.replace(' ', '_')
+            # no primes too, please :(
+            name = name.replace('\'', '_')
 
             # update existing xml file
             if targetNames is not None and name in targetNames:
