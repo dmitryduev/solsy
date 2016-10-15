@@ -1067,7 +1067,7 @@ class TargetListAsteroids(object):
         ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
         dec = dms(radec[1])
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-        ''' !!! NOTE: ra rate must be with a minus sign !!! '''
+        ''' !!! NOTE: ra rate must be with a minus sign for the TCS !!! '''
         ra_rate = '{:.5f}'.format(-radec_dot[0])
         dec_rate = '{:.5f}'.format(radec_dot[1])
 
@@ -1398,7 +1398,7 @@ class TargetXML(object):
                                                ('done', 0),
                                                ('Observation',
                                                 [OrderedDict([('number', 1),
-                                                              ('exposure_time', 120),
+                                                              ('exposure_time', 300),
                                                               ('ao_flag', 1),
                                                               ('filter_code', 'FILTER_LONGPASS_600'),
                                                               ('camera_mode', ''),
