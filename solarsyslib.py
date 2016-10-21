@@ -1500,9 +1500,10 @@ class TargetXML(object):
                 xml = self.Targets[targetNames[name]]
 
                 if is_planet_or_moon(name) or not is_multiple_asteroid(name):
-                    xml['comment'] = 'modified {:s}'.format(str(datetime.datetime.now()))
+                    xml['comment'] = 'modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
                 elif is_multiple_asteroid(name):
-                    xml['comment'] = 'known multiple; modified {:s}'.format(str(datetime.datetime.now()))
+                    xml['comment'] = \
+                        'known_multiple;_modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
                 xml['Object'][0]['RA'] = \
                     '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(target[2][0]))
                 dec = dms(target[2][1])
