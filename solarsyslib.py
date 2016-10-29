@@ -413,7 +413,7 @@ def is_multiple_asteroid(name):
     """
     try:
         number = int(name.split('_')[0])
-    except Exception, err:
+    except Exception as err:
         print(str(err))
         print('could not get the asteroid number.')
         return False
@@ -1256,7 +1256,7 @@ class TargetListAsteroids(object):
                 response = urllib2.urlopen('http://ssd.jpl.nasa.gov/dat/ELEMENTS.NUMBR')
                 with open(_f_database, 'w') as f:
                     f.write(response.read())
-            except Exception, err:
+            except Exception as err:
                 print(str(err))
                 pass
 
