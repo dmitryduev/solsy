@@ -17,7 +17,7 @@ import datetime
 from astropy.table import Table
 from astropy import units as u
 from solarsyslib import TargetListAsteroids, TargetXML, \
-                        get_guide_star, asteroid_multiples_numbers
+                        get_guide_star
 import pytz
 import ConfigParser
 import inspect
@@ -69,7 +69,7 @@ if __name__ == '__main__':
         # triples:
         # 45 Eugenia, 87 Sylvia, 93 Minerva, 130 Elektra, 216 Kleopatra, 3749 Balam
         # all known multiples
-        multiples_num = asteroid_multiples_numbers()
+        multiples_num = np.array([45, 93])
         # mask by asteroid number:
         mask = multiples_num - 1
     else:
