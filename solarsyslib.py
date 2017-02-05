@@ -1450,11 +1450,12 @@ class TargetXML(object):
                                                    '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
                 # why not?
-                t_xml = datetime.datetime.now() - datetime.timedelta(days=3)
+                t_xml = datetime.datetime.now() - datetime.timedelta(days=10)
             # updated > 2 days ago?
-            if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
-                    and targ['done'] == '0' \
-                    and targ['Object'][0]['Observation'][0]['repeated'] == '0':
+            if (datetime.datetime.now() - t_xml).total_seconds() > 86400 * 2:
+            # if (datetime.datetime.now() - t_xml).total_seconds() > 86400*2 \
+            #         and targ['done'] == '0' \
+            #         and targ['Object'][0]['Observation'][0]['repeated'] == '0':
                 # print(targ['comment'], targ['done'])
                 target_nums_to_remove.append(targ_num+1)
 
