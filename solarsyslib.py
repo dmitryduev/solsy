@@ -623,7 +623,8 @@ class TargetListPlanetsAndMoons(object):
         sunSet = self.observatory.sun_set_time(astrot[0])
         sunRise = self.observatory.sun_rise_time(astrot[1])
 
-        night = Time([str(sunSet.datetime), str(sunRise.datetime)],
+        night = Time([sunSet.datetime[0].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                      sunRise.datetime[0].strftime('%Y-%m-%d %H:%M:%S.%f')],
                      format='iso', scale='utc')
 
         # build time grid for the night to come
