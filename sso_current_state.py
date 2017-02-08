@@ -93,7 +93,7 @@ class Kepler(object):
     @staticmethod
     # @jit
     def kepler(e, M):
-        """ Solve Kepler's equation
+        """ Solve Asteroid's equation
 
         :param e: eccentricity
         :param M: mean anomaly, rad
@@ -331,7 +331,7 @@ class Kepler(object):
 def get_asteroid_state(target, mjd, _kernel):
     """ Compute obs parameters for a given t
 
-    :param target: Kepler class object
+    :param target: Asteroid class object
     :param mjd: epoch in TDB/mjd (t.tdb.mjd, t - astropy.Time object, UTC)
     :param _kernel: DE SPK kernel
     :return: radec in rad, radec_dot in arcsec/s, Vmag

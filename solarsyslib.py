@@ -41,6 +41,7 @@ from pypride.vintlib import factorise, aber_source, R_123
 from pypride.vintlib import taitime, eop_iers, t_eph, ter2cel, \
     load_cats, sph2cart, cart2sph, iau_PNM00A
 from pypride.vintlib import eop_update
+# from auromat.coordinates.transform import geodetic2Ecef
 
 # from astroplan import FixedTarget
 from astroplan import observability_table  # , is_observable, is_always_observable
@@ -75,6 +76,23 @@ def _target_is_vector(target):
         return True
     else:
         return False
+
+
+class Site(object):
+    """
+        Quick and dirty!
+    """
+
+    def __init__(self, r_GTRS):
+        if not isinstance(r_GTRS, (np.ndarray, np.generic)):
+            r_GTRS = np.array(r_GTRS)
+        self.r_GTRS = r_GTRS
+        self.r_GCRS = None
+        self.r_BCRS = None
+
+    def GTRS_to_GCRS(self, r2000):
+        self.r_GCRS = np.dot(r2000[:, :, 0], self.r_GTRS)
+        self.v_GCRS = np.dot(r2000[:, :, 1], self.r_GTRS)
 
 
 # overload target meridian transit
@@ -202,7 +220,7 @@ def is_multiple_asteroid(name):
         return False
 
 
-class Kepler(object):
+class Asteroid(object):
     """
        Class to work with Keplerian orbits (of Asteroids)
     """
@@ -237,19 +255,22 @@ class Kepler(object):
 
     @staticmethod
     @jit
-    def kepler(e, M):
+    def kepler(e, M, tol=1e-10):
         """ Solve Kepler's equation
 
         :param e: eccentricity
         :param M: mean anomaly, rad
+        :param tol: precision
         :return:
         """
         E = deepcopy(M)
         tmp = 1
 
-        while np.abs(E - tmp) > 1e-9:
+        for i in range(10):
             tmp = deepcopy(E)
             E += (M - E + e * np.sin(E)) / (1 - e * np.cos(E))
+            if np.abs(E - tmp) < tol:
+                break
 
         return E
 
@@ -265,7 +286,7 @@ class Kepler(object):
         # mean anomaly at t:
         M = n * (t - self.t0) + self.M0
         #        print(np.fmod(M, 2*np.pi))
-        # solve Kepler equation, get eccentric anomaly:
+        # solve Asteroid equation, get eccentric anomaly:
         E = self.kepler(self.e, M)
         cosE = np.cos(E)
         sinE = np.sin(E)
@@ -326,7 +347,7 @@ class Kepler(object):
         return state
 
     @staticmethod
-    def PNmatrix(t, inp):
+    def PNmatrix(t, _inp):
         """
             Compute (geocentric) precession/nutation matrix for epoch
             t -- astropy.time.Time object
@@ -344,7 +365,7 @@ class Kepler(object):
         TAI, TT = taitime(mjd, UTC)
 
         ''' load cats '''
-        _, _, eops = load_cats(inp, 'DUMMY', 'S', ['GEOCENTR'], tstamp)
+        _, _, eops = load_cats(_inp, 'DUMMY', 'S', ['GEOCENTR'], tstamp)
 
         ''' interpolate eops to tstamp '''
         UT1, eop_int = eop_iers(mjd, UTC, eops)
@@ -359,13 +380,16 @@ class Kepler(object):
         return r2000
 
     @jit
-    def raDecVmag(self, mjd, jpl_eph, epoch='J2000'):
+    def raDecVmag(self, mjd, jpl_eph, epoch='J2000', station=None, output_Vmag=False, _inp=None):
         """ Calculate ra/dec's from equatorial state
             Then compute asteroid's expected visual magnitude
 
         :param mjd: MJD epoch in decimal days
         :param jpl_eph: target's heliocentric equatorial
-        :param epoch: RA/Dec epoch. 'J2000' or 'Date'
+        :param epoch: RA/Dec epoch. 'J2000', 'Date' or float (like 2015.0)
+        :param station: None or pypride station object
+        :param output_Vmag: return Vmag?
+        :param _inp:
 
         :return: SkyCoord(ra,dec), ra/dec rates, Vmag
         """
@@ -381,11 +405,19 @@ class Kepler(object):
         # target state:
         state = self.ecliptic_to_equatorial(self.to_cart(mjd))
 
-        # quick and dirty (but accurate enough for pointing, I hope)
+        # station GCRS position/velocity:
+        if station is not None and station.r_GCRS is None:
+            r2000 = self.PNmatrix(Time(mjd, format='mjd'), _inp)
+            station.GTRS_to_GCRS(r2000)
+
+        # quick and dirty LT computation (but accurate enough for pointing, I hope)
         # LT-correction:
         C = 299792458.0
-        lt = np.linalg.norm(earth[:, 0] - (sun[:, 0] + state[:, 0])) / C
-        #        print(lt)
+        if station is None:
+            lt = np.linalg.norm(earth[:, 0] - (sun[:, 0] + state[:, 0])) / C
+        else:
+            lt = np.linalg.norm((earth[:, 0] + station.r_GCRS) - (sun[:, 0] + state[:, 0])) / C
+        # print(lt)
 
         # recompute:
         # Sun:
@@ -394,15 +426,40 @@ class Kepler(object):
         # target state:
         state = self.ecliptic_to_equatorial(self.to_cart(mjd - lt / 86400.0))
 
-        r = (sun[:, 0] + state[:, 0]) - earth[:, 0]
+        if station is None:
+            lt = np.linalg.norm(earth[:, 0] - (sun[:, 0] + state[:, 0])) / C
+        else:
+            lt = np.linalg.norm((earth[:, 0] + station.r_GCRS) - (sun[:, 0] + state[:, 0])) / C
+        # print(lt)
+
+        # recompute again:
+        # Sun:
+        rrd = pleph(jd - lt / 86400.0, 11, 12, jpl_eph)
+        sun = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
+        # target state:
+        state = self.ecliptic_to_equatorial(self.to_cart(mjd - lt / 86400.0))
+
+        # geocentric/topocentric RA/Dec
+        if station is None:
+            r = (sun[:, 0] + state[:, 0]) - earth[:, 0]
+        else:
+            r = (sun[:, 0] + state[:, 0]) - (earth[:, 0] + station.r_GCRS)
         # RA/Dec J2000:
         ra = np.arctan2(r[1], r[0])  # right ascension
         dec = np.arctan(r[2] / np.sqrt(r[0] ** 2 + r[1] ** 2))  # declination
         if ra < 0:
             ra += 2.0 * np.pi
 
+        # barycentric position:
+        # r_bc = sun[:, 0] + state[:, 0]
+        # print(r_bc)
+        # print(r)
+
         # go for time derivatives:
-        v = (sun[:, 1] + state[:, 1]) - earth[:, 1]
+        if station is None:
+            v = (sun[:, 1] + state[:, 1]) - earth[:, 1]
+        else:
+            v = (sun[:, 1] + state[:, 1]) - (earth[:, 1] + station.v_GCRS)
         # in rad/s:
         ra_dot = (v[1] / r[0] - r[1] * v[0] / r[0] ** 2) / (1 + (r[1] / r[0]) ** 2)
         dec_dot = (v[2] / np.sqrt(r[0] ** 2 + r[1] ** 2) -
@@ -418,17 +475,30 @@ class Kepler(object):
         #        print(ra_dot * np.cos(dec), dec_dot)
 
         # RA/Dec to date:
-        if epoch != 'J2000' or epoch == 'Date':
+        if epoch != 'J2000':
+            print(ra, dec)
             xyz2000 = sph2cart(np.array([1.0, dec, ra]))
+            if epoch != 'Date' and isinstance(epoch, float):
+                jd = Time(epoch, format='jyear').jd
             rDate = iau_PNM00A(jd, 0.0)
+            # print(rDate)
+
+            # full matrix?
+            # rDate = self.PNmatrix(Time(jd, format='jd'), _inp)[:, :, 0]
+            # print(rDate)
+
+            # rotate to epoch:
             xyzDate = np.dot(rDate, xyz2000)
             dec, ra = cart2sph(xyzDate)[1:]
             if ra < 0:
                 ra += 2.0 * np.pi
+            print(ra, dec)
 
         ''' go for Vmag based on H-G model '''
         if self.H is None or self.G is None:
             print('Can\'t compute Vmag - no H-G model data provided.')
+            Vmag = None
+        elif not output_Vmag:
             Vmag = None
         else:
             # phase angle:
@@ -452,10 +522,10 @@ class Kepler(object):
             phi2l = np.exp(-1.862 * (np.tan(alpha / 2.0)) ** 1.218)
             phi2 = W * phi2s + (1.0 - W) * phi2l
 
-            AU_DE421 = 1.49597870699626200e+11  # m
+            AU_DE430 = 1.49597870700000000e+11  # m
 
             Vmag = self.H - 2.5 * np.log10((1.0 - self.G) * phi1 + self.G * phi2) + \
-                   5.0 * np.log10(EA_norm * SA_norm / AU_DE421 ** 2)
+                   5.0 * np.log10(EA_norm * SA_norm / AU_DE430 ** 2)
 
         # returning SkyCoord is handy, but very expensive
         # return (SkyCoord(ra=ra, dec=dec, unit=(u.rad, u.rad), frame='icrs'),
@@ -469,8 +539,10 @@ def target_list_all_helper(args):
     :param args:
     :return:
     """
-    targlist, asteroid, mjd, night = args
-    radec, radec_rate, Vmag = targlist.getObsParams(asteroid, mjd)
+    targlist, asteroid, mjd, night, epoch, station, output_Vmag = args
+    _inp = targlist.inp
+    radec, radec_rate, Vmag = targlist.getObsParams(asteroid, mjd, epoch=epoch, station=station,
+                                                    output_Vmag=output_Vmag, _inp=_inp)
     # meridian_transit = targlist.get_hour_angle_limit(night, radec[0], radec[1])
     # return [radec, radec_rate, Vmag, meridian_transit]
     return [radec, radec_rate, Vmag]
@@ -851,7 +923,7 @@ class TargetListAsteroids(object):
 
         return ra, dec, ra_rate, dec_rate
 
-    def target_list_all(self, day, mask=None, parallel=False):
+    def target_list_all(self, day, mask=None, parallel=False, epoch='J2000', station=None, output_Vmag=True):
         """
             Get observational parameters for a (masked) target list
             from self.database
@@ -873,7 +945,7 @@ class TargetListAsteroids(object):
             pool = multiprocessing.Pool(n_cpu)
             # asynchronously apply target_list_all_helper
             database_masked = self.database[mask]
-            args = [(self, asteroid, mjd, night) for asteroid in database_masked]
+            args = [(self, asteroid, mjd, night, epoch, station, output_Vmag) for asteroid in database_masked]
             result = pool.map_async(target_list_all_helper, args)
             # close bassejn
             pool.close()  # we are not adding any more processes
@@ -906,7 +978,8 @@ class TargetListAsteroids(object):
                 # print('\n', asteroid)
                 # in the middle of night...
                 # tic = _time()
-                radec, radec_dot, Vmag = self.getObsParams(asteroid, mjd)
+                radec, radec_dot, Vmag = self.getObsParams(asteroid, mjd, epoch=epoch, station=station,
+                                                           output_Vmag=output_Vmag)
                 # print(len(self.database)-ia, _time() - tic)
                 # skip if too dim
                 if Vmag <= self.m_lim:
@@ -963,10 +1036,10 @@ class TargetListAsteroids(object):
               'observable: ', len(target_list_observeable))
         return target_list_observeable
 
-    def getObsParams(self, target, mjd):
+    def getObsParams(self, target, mjd, epoch='J2000', station=None, output_Vmag=True, _inp=None):
         """ Compute obs parameters for a given t
 
-        :param target: Kepler class object
+        :param target: Asteroid class object
         :param mjd: epoch in TDB/mjd (t.tdb.mjd, t - astropy.Time object, UTC)
         :return: radec in rad, radec_dot in arcsec/s, Vmag
         """
@@ -985,10 +1058,11 @@ class TargetListAsteroids(object):
         H = target['H']
         G = target['G']
 
-        asteroid = Kepler(a, e, i, w, Node, M0, GSUN, t0, H, G)
+        asteroid = Asteroid(a, e, i, w, Node, M0, GSUN, t0, H, G)
 
         # jpl_eph - path to eph used by pypride
-        radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, self.inp['jpl_eph'])
+        radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, self.inp['jpl_eph'], epoch=epoch, station=station,
+                                                    output_Vmag=output_Vmag, _inp=_inp)
         #    print(radec.ra.hms, radec.dec.dms, radec_dot, Vmag)
 
         return radec, radec_dot, Vmag
@@ -1004,12 +1078,14 @@ class TargetListAsteroids(object):
         sunSet = self.observatory.sun_set_time(astrot[0])
         sunRise = self.observatory.sun_rise_time(astrot[1])
 
-        night = Time([str(sunSet.datetime), str(sunRise.datetime)],
+        night = Time([sunSet.datetime[0].strftime('%Y-%m-%d %H:%M:%S.%f'),
+                      sunRise.datetime[0].strftime('%Y-%m-%d %H:%M:%S.%f')],
                      format='iso', scale='utc')
 
         # build time grid for the night to come
         time_grid = time_grid_from_range(night)
         middle_of_night = time_grid[len(time_grid) / 2]
+        # print(middle_of_night.datetime)
 
         return night, middle_of_night
 
@@ -1178,7 +1254,7 @@ class TargetXML(object):
                                                 [OrderedDict([('number', 1),
                                                               ('exposure_time', 180),
                                                               ('ao_flag', 1),
-                                                              ('filter_code', 'FILTER_LONGPASS_600'),
+                                                              ('filter_code', 'FILTER_SLOAN_I'),
                                                               ('camera_mode', ''),
                                                               ('repeat_times', 1),
                                                               ('repeated', 0),
@@ -1587,9 +1663,8 @@ def get_gss(table):
                 bgsib.bands[band].setCrd(ra, dec)
                 bgsib.bands[band].setSeparation(sep)
                 for band_gs in bgsib.bands.keys():
-                    if table[band_gs].mask[min_ind] != True:
-                        bgsib.bands[band].setMag(band_gs,
-                                                 float(table[band_gs][min_ind]))
+                    if not table[band_gs].mask[min_ind]:
+                        bgsib.bands[band].setMag(band_gs, float(table[band_gs][min_ind]))
         except:
             continue
 

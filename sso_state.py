@@ -21,6 +21,8 @@ from numba import jit
 from copy import deepcopy
 import linecache
 from astropy.time import Time
+# from astropy.coordinates import Angle
+# from astropy import units as u
 import ephem
 import datetime
 import urllib2
@@ -30,6 +32,7 @@ from pypride.classes import inp_set
 from pypride.vintflib import pleph
 from pypride.vintlib import sph2cart, cart2sph, iau_PNM00A
 from pypride.vintlib import eop_update
+from auromat.coordinates.transform import geodetic2Ecef
 import traceback
 
 
@@ -59,6 +62,23 @@ def hms(rad):
     m, s = divmod(m, np.pi/12/60)
     s /= np.pi/12/3600
     return [h, m, s]
+
+
+class Site(object):
+    """
+        Quick and dirty!
+    """
+
+    def __init__(self, r_GTRS):
+        if not isinstance(r_GTRS, (np.ndarray, np.generic)):
+            r_GTRS = np.array(r_GTRS)
+        self.r_GTRS = r_GTRS
+        self.r_GCRS = None
+        self.r_BCRS = None
+
+    def GTRS_to_GCRS(self, r2000):
+        self.r_GCRS = np.dot(r2000[:, :, 0], self.r_GTRS)
+        self.v_GCRS = np.dot(r2000[:, :, 1], self.r_GTRS)
 
 
 class Kepler(object):
@@ -97,7 +117,7 @@ class Kepler(object):
     @staticmethod
     @jit
     def kepler(e, M):
-        """ Solve Kepler's equation
+        """ Solve Asteroid's equation
 
         :param e: eccentricity
         :param M: mean anomaly, rad
@@ -124,7 +144,7 @@ class Kepler(object):
         # mean anomaly at t:
         M = n * (t - self.t0) + self.M0
         #        print(np.fmod(M, 2*np.pi))
-        # solve Kepler equation, get eccentric anomaly:
+        # solve Asteroid equation, get eccentric anomaly:
         E = self.kepler(self.e, M)
         cosE = np.cos(E)
         sinE = np.sin(E)
@@ -185,7 +205,7 @@ class Kepler(object):
         return state
 
     @staticmethod
-    def PNmatrix(t, inp):
+    def PNmatrix(t, _inp):
         """
             Compute (geocentric) IAU2000 precession/nutation matrix for epoch
             t -- astropy.time.Time object
@@ -203,7 +223,7 @@ class Kepler(object):
         TAI, TT = taitime(mjd, UTC)
 
         ''' load cats '''
-        _, _, eops = load_cats(inp, 'DUMMY', 'S', ['GEOCENTR'], tstamp)
+        _, _, eops = load_cats(_inp, 'DUMMY', 'S', ['GEOCENTR'], tstamp)
 
         ''' interpolate eops to tstamp '''
         UT1, eop_int = eop_iers(mjd, UTC, eops)
@@ -218,7 +238,7 @@ class Kepler(object):
         return r2000
 
     # @jit
-    def raDecVmag(self, mjd, jpl_eph, epoch='J2000', station=None, output_Vmag=False):
+    def raDecVmag(self, mjd, jpl_eph, epoch='J2000', station=None, output_Vmag=False, _inp=None):
         """ Calculate ra/dec's from equatorial state
             Then compute asteroid's expected visual magnitude
 
@@ -227,6 +247,7 @@ class Kepler(object):
         :param epoch: RA/Dec epoch. 'J2000', 'Date' or float (like 2015.0)
         :param station: None or pypride station object
         :param output_Vmag: return Vmag?
+        :param _inp:
 
         :return: SkyCoord(ra,dec), ra/dec rates, Vmag
         """
@@ -241,6 +262,11 @@ class Kepler(object):
         sun = np.reshape(np.asarray(rrd), (3, 2), 'F') * 1e3
         # target state:
         state = self.ecliptic_to_equatorial(self.to_cart(mjd))
+
+        # station GCRS position/velocity:
+        if station is not None and station.r_GCRS is None:
+            r2000 = self.PNmatrix(Time(mjd, format='mjd'), _inp)
+            station.GTRS_to_GCRS(r2000)
 
         # quick and dirty LT computation (but accurate enough for pointing, I hope)
         # LT-correction:
@@ -282,6 +308,11 @@ class Kepler(object):
         if ra < 0:
             ra += 2.0 * np.pi
 
+        # barycentric position:
+        # r_bc = sun[:, 0] + state[:, 0]
+        # print(r_bc)
+        # print(r)
+
         # go for time derivatives:
         if station is None:
             v = (sun[:, 1] + state[:, 1]) - earth[:, 1]
@@ -308,6 +339,13 @@ class Kepler(object):
             if epoch != 'Date' and isinstance(epoch, float):
                 jd = Time(epoch, format='jyear').jd
             rDate = iau_PNM00A(jd, 0.0)
+            # print(rDate)
+
+            # full matrix?
+            # rDate = self.PNmatrix(Time(jd, format='jd'), _inp)[:, :, 0]
+            # print(rDate)
+
+            # rotate to epoch:
             xyzDate = np.dot(rDate, xyz2000)
             dec, ra = cart2sph(xyzDate)[1:]
             if ra < 0:
@@ -353,10 +391,10 @@ class Kepler(object):
         return [ra, dec], [ra_dot, dec_dot], Vmag
 
 
-def get_asteroid_state(target, mjd, _jpl_eph, _epoch='J2000', _station=None):
+def get_asteroid_state(target, mjd, _jpl_eph, _epoch='J2000', _station=None, _inp=None):
     """ Compute obs parameters for a given t
 
-    :param target: Kepler class object
+    :param target: Asteroid class object
     :param mjd: epoch in TDB/mjd (t.tdb.mjd, t - astropy.Time object, UTC)
     :param _jpl_eph: DE eph from pypride
     :param _epoch: 'J2000' (default), 'Date', or float (jdate like 2015.0)
@@ -382,7 +420,8 @@ def get_asteroid_state(target, mjd, _jpl_eph, _epoch='J2000', _station=None):
     asteroid = Kepler(a, e, i, w, Node, M0, GSUN, t0, H, G)
 
     # jpl_eph - path to eph used by pypride
-    radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, jpl_eph=_jpl_eph, epoch=_epoch, station=_station, output_Vmag=True)
+    radec, radec_dot, Vmag = asteroid.raDecVmag(mjd, jpl_eph=_jpl_eph, epoch=_epoch,
+                                                station=_station, output_Vmag=True, _inp=_inp)
 
     return radec, radec_dot, Vmag
 
@@ -439,17 +478,20 @@ def asteroid_data_load(_f_database, asteroid_name):
                                tuple(map(float, l[25:].split()[:-2])))], dtype=dt)
 
 
-def get_state_asteroid(_asteroid, _t, _jpl_eph):
+def get_state_asteroid(_asteroid, _t, _jpl_eph, _inp, _station=None):
     """
     :param _asteroid:
     :param _t:
     :param _jpl_eph:
+    :param _inp:
+    :param _station:
     :return:
      current J2000 ra/dec of a moving object
      current J2000 ra/dec rates of a moving object
      if mag <= self.m_lim
     """
-    radec, radec_dot, vmag = get_asteroid_state(_asteroid, _t, _jpl_eph)
+    radec, radec_dot, vmag = get_asteroid_state(_asteroid, _t, _jpl_eph,
+                                                _epoch='J2000', _station=_station, _inp=_inp)
 
     # reformat
     ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
@@ -466,7 +508,7 @@ def get_state_asteroid(_asteroid, _t, _jpl_eph):
     return ra, dec, ra_rate, dec_rate, vmag
 
 
-def get_state_asteroid_astropy(_asteroid, _t, _jpl_eph, _epoch='J2000', _station=None):
+def get_state_asteroid_astropy(_asteroid, _t, _jpl_eph, _epoch='J2000', _station=None, _inp=None):
     """
     :param _asteroid:
     :param _t:
@@ -479,7 +521,7 @@ def get_state_asteroid_astropy(_asteroid, _t, _jpl_eph, _epoch='J2000', _station
      current ra/dec rates of a moving object at epoch
      if mag <= self.m_lim
     """
-    radec, radec_dot, vmag = get_asteroid_state(_asteroid, _t, _jpl_eph, _epoch, _station)
+    radec, radec_dot, vmag = get_asteroid_state(_asteroid, _t, _jpl_eph, _epoch, _station, _inp)
 
     # reformat
     ra = '{:02.0f}h{:02.0f}m{:02.3f}s'.format(*hms(radec[0]))
@@ -551,7 +593,7 @@ def get_state_planet_or_moon(body, t):
     return ra, dec, ra_rate, dec_rate
 
 
-def sso_state(_name, _time, _path_to_database, _path_to_jpl_eph, _epoch, _station=None):
+def sso_state(_name, _time, _path_to_database, _path_to_jpl_eph, _epoch, _station=None, _inp=None):
     """
 
     :param _name:
@@ -575,7 +617,7 @@ def sso_state(_name, _time, _path_to_database, _path_to_jpl_eph, _epoch, _statio
         try:
             ra, dec, ra_rate, dec_rate, vmag = get_state_asteroid_astropy(_asteroid=asteroid, _t=_time.tdb.mjd,
                                                                           _jpl_eph=_path_to_jpl_eph, _epoch=_epoch,
-                                                                          _station=_station)
+                                                                          _station=_station, _inp=_inp)
             # print(0, ra, dec, ra_rate, dec_rate, vmag)
         except Exception as e:
             print(e)
@@ -610,6 +652,13 @@ if __name__ == '__main__':
 
     # update pypride eops
     eop_update(inp['cat_eop'], 3)
+
+    # site: KPNO 2.1 m: 31.958182 N, -111.598273 W, 2086.7 m (31°57'29.5"N 111°35'53.8"W)
+    r_GTRS = geodetic2Ecef(lat=31.958182 * np.pi / 180.0, lon=-111.598273 * np.pi / 180.0, h=2086.7e-3)
+    r_GTRS = np.array(r_GTRS) * 1e3  # in meters
+    kitt_peak = Site(r_GTRS)
+    # print(kitt_peak.r_GTRS)
+    # kitt_peak = None
 
     # create parser
     parser = ArgumentParser(prog='sso_state.py',
@@ -659,7 +708,8 @@ if __name__ == '__main__':
 
         try:
             ra, dec, ra_rate, dec_rate, _ = get_state_asteroid(_asteroid=asteroid, _t=time.tdb.mjd,
-                                                               _jpl_eph=inp['jpl_eph'])
+                                                               _jpl_eph=inp['jpl_eph'], _inp=inp,
+                                                               _station=kitt_peak)
             print(0, ra, dec, ra_rate, dec_rate)
         except Exception:
             # print error code 4 (calculation failed) and exit

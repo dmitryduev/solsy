@@ -16,8 +16,8 @@ import numpy as np
 import datetime
 from astropy.table import Table
 from astropy import units as u
-from solarsyslib import TargetListAsteroids, TargetXML, \
-                        get_guide_star
+from solarsyslib import TargetListAsteroids, TargetXML, get_guide_star, Site
+from auromat.coordinates.transform import geodetic2Ecef
 import pytz
 import ConfigParser
 import inspect
@@ -53,6 +53,13 @@ if __name__ == '__main__':
     observatory = config.get('Observatory', 'observatory')
     timezone = config.get('Observatory', 'timezone')
 
+    # site: KPNO 2.1 m: 31.958182 N, -111.598273 W, 2086.7 m (31°57'29.5"N 111°35'53.8"W)
+    r_GTRS = geodetic2Ecef(lat=31.958182 * np.pi / 180.0, lon=-111.598273 * np.pi / 180.0, h=2086.7e-3)
+    r_GTRS = np.array(r_GTRS) * 1e3  # in meters
+    kitt_peak = Site(r_GTRS)
+    # print(kitt_peak.r_GTRS)
+    # kitt_peak = None
+
     # observability settings:
     # nighttime between twilights: astronomical (< -18 deg), civil (< -6 deg), nautical (< -12 deg)
     twilight = config.get('Asteroids', 'twilight')
@@ -82,7 +89,9 @@ if __name__ == '__main__':
     today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
 
     tl = TargetListAsteroids(f_database, f_inp, _observatory=observatory, _m_lim=m_lim, date=today)
-    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today,
+    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True,
+                                                           epoch='J2000', station=kitt_peak,
+                                                           output_Vmag=True), today,
                                         elv_lim=elv_lim, twilight=twilight, fraction=fraction)
 
     ''' find guide stars for targets with Vmag>16.5 '''
@@ -120,7 +129,9 @@ if __name__ == '__main__':
     mask = asteroid_hp_num - 1
 
     tl = TargetListAsteroids(f_database, f_inp, _observatory='kitt peak', _m_lim=16.5, date=today)
-    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True), today)
+    targets = tl.target_list_observable(tl.target_list_all(today, mask, parallel=True,
+                                                           epoch='J2000', station=kitt_peak,
+                                                           output_Vmag=True), today)
 
     ''' make/change XML files '''
     path = config.get('Path', 'program_path')
