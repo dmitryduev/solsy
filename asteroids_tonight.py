@@ -16,8 +16,7 @@ import numpy as np
 import datetime
 from astropy.table import Table
 from astropy import units as u
-from solarsyslib import TargetListAsteroids, TargetXML, get_guide_star, Site
-from auromat.coordinates.transform import geodetic2Ecef
+from solarsyslib import TargetListAsteroids, TargetXML, get_guide_star, Site, geodetic2Ecef
 import pytz
 import ConfigParser
 import inspect

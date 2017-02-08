@@ -32,8 +32,45 @@ from pypride.classes import inp_set
 from pypride.vintflib import pleph
 from pypride.vintlib import sph2cart, cart2sph, iau_PNM00A
 from pypride.vintlib import eop_update
-from auromat.coordinates.transform import geodetic2Ecef
+# from auromat.coordinates.transform import geodetic2Ecef
 import traceback
+
+
+def geodetic2Ecef(lat, lon, h, a=None, b=None):
+    """
+    Converts geodetic to Earth Centered, Earth Fixed coordinates.
+
+    Parameters h, a, and b must be given in the same unit.
+    The values of the return tuple then also have this unit.
+
+    :param lat: latitude(s) in radians
+    :param lon: longitude(s) in radians
+    :param h: height(s)
+    :param a: equatorial axis of the ellipsoid of revolution
+    :param b: polar axis of the ellipsoid of revolution
+    :rtype: tuple (x,y,z)
+    """
+    if a is None and b is None:
+        WGS84_a = 6378137.0  # meters
+        """the equatorial radius in meters of the WGS84 ellipsoid in meters"""
+        WGS84_f = 1 / 298.257223563
+        """the flattening of the WGS84 ellipsoid, 1/298.257223563"""
+
+        wgs84A = WGS84_a / 1000
+        wgs84B = wgs84A * (1 - WGS84_f)
+
+        a, b = wgs84A, wgs84B
+
+    lat, lon, h = np.asarray(lat), np.asarray(lon), np.asarray(h)
+    e2 = (a * a - b * b) / (a * a)  # first eccentricity squared
+    n = a / np.sqrt(1 - e2 * np.sin(lat) ** 2)
+    latCos = np.cos(lat)
+    nh = n + h
+    x = nh * latCos * np.cos(lon)
+    y = nh * latCos * np.sin(lon)
+    z = (n * (1 - e2) + h) * np.sin(lat)
+
+    return x, y, z
 
 
 class ArgumentParser(argparse.ArgumentParser):
