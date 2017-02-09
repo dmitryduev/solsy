@@ -28,19 +28,29 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='asteroids_tonight.py',
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description='Create nightly target list for the asteroids program.')
+    # positional arguments
+    parser.add_argument('config_file', type=str, help='config file')
     # optional arguments
     parser.add_argument('-m', '--multiples', action='store_true',
                         help='process only known multiples')
-    # positional arguments
-    # parser.add_argument('name', type=str, help='object name')
 
     # a parser exception (e.g. if no argument was given) will be caught
     args = parser.parse_args()
 
     # load config data
-    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
     config = ConfigParser.RawConfigParser()
-    config.read(os.path.join(abs_path, 'config.ini'))
+    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
+    try:
+        if not os.path.isabs(args.config_file):
+            config.read(os.path.join(abs_path, args.config_file))
+        else:
+            config.read(args.config_file)
+    except IOError:
+        print('failed to load config file {:s}, trying ./config.ini'.format(args.config_file))
+        try:
+            config.read(os.path.join(abs_path, 'config.ini'))
+        except IOError:
+            raise Exception('config file ./config.ini not found')
 
     # asteroid database:
     path_to_database = config.get('Path', 'asteroid_database_path')
