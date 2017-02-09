@@ -1539,19 +1539,19 @@ class TargetXML(object):
             tree = ET.parse(os.path.join(self.path, target_xml))
             root = tree.getroot()
 
-            targ = {}
+            targ = dict()
             targ['Object'] = []
             for content in root:
                 if content.tag != 'Object':
                     targ[content.tag] = content.text
                 else:
-                    obj = {}
+                    obj = dict()
                     obj['Observation'] = []
                     for data_obj in content:
                         if data_obj.tag != 'Observation':
                             obj[data_obj.tag] = data_obj.text
                         else:
-                            obs = {}
+                            obs = dict()
                             for data_obs in data_obj:
                                 obs[data_obs.tag] = data_obs.text
                             obj['Observation'].append(obs)
@@ -1559,6 +1559,7 @@ class TargetXML(object):
 
             try:
                 # TODO: the queue software does not like spaces even in comments
+                print(targ['comment'], ' '.join(targ['comment'].split('_')[-2:]))
                 t_xml = datetime.datetime.strptime(' '.join(targ['comment'].split('_')[-2:]),
                                                    '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
