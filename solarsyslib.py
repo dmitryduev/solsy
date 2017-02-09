@@ -1444,9 +1444,10 @@ class TargetXML(object):
                 xml['number'] = target_max_num + added_target_xml_files
                 xml['name'] = name
                 if is_planet_or_moon(name) or not is_multiple_asteroid(name):
-                    xml['comment'] = 'modified {:s}'.format(str(datetime.datetime.now()))
+                    xml['comment'] = 'modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
                 elif is_multiple_asteroid(name):
-                    xml['comment'] = 'known multiple; modified {:s}'.format(str(datetime.datetime.now()))
+                    xml['comment'] = \
+                        'known_multiple;_modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
                 xml['Object'][0]['RA'] = \
                     '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(target[2][0]))
                 dec = dms(target[2][1])
@@ -1559,7 +1560,6 @@ class TargetXML(object):
 
             try:
                 # TODO: the queue software does not like spaces even in comments
-                print(targ['comment'], ' '.join(targ['comment'].split('_')[-2:]))
                 t_xml = datetime.datetime.strptime(' '.join(targ['comment'].split('_')[-2:]),
                                                    '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
