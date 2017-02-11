@@ -929,8 +929,8 @@ class TargetListAsteroids(object):
         t = np.linspace(0, 1, N)
         p = np.polyfit(t, altitudes, 6)
         dense = np.polyval(p, np.linspace(0, 1, 200))
-        maxp = np.max(dense)
-        root = np.argmax(dense)/200.0
+        maxp = np.argmax(dense)
+        root = maxp/200.0
         minus = np.polyval(p, maxp - 0.01)
         plus = np.polyval(p, maxp + 0.01)
 
@@ -1343,8 +1343,8 @@ class TargetListComets(object):
         t = np.linspace(0, 1, N)
         p = np.polyfit(t, altitudes, 6)
         dense = np.polyval(p, np.linspace(0, 1, 200))
-        maxp = np.max(dense)
-        root = np.argmax(dense)/200.0
+        maxp = np.argmax(dense)
+        root = maxp/200.0
         minus = np.polyval(p, maxp - 0.01)
         plus = np.polyval(p, maxp + 0.01)
 
