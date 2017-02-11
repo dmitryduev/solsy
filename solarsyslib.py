@@ -930,12 +930,13 @@ class TargetListAsteroids(object):
         p = np.polyfit(t, altitudes, 6)
         dense = np.polyval(p, np.linspace(0, 1, 200))
         maxp = np.argmax(dense)
+        maxv = np.max(dense)
         root = maxp/200.0
-        minus = np.polyval(p, maxp - 0.01)
-        plus = np.polyval(p, maxp + 0.01)
+        minus = np.polyval(p, root - 0.01)
+        plus = np.polyval(p, root + 0.01)
 
         # print('pypride ', (time[0] + root * u.day).iso)
-        return (time[0] + root*u.day < time[1]) and (np.max((minus, plus)) < maxp)
+        return (time[0] + root*u.day < time[-1]) and (np.max((minus, plus)) < maxv)
 
     def get_current_state(self, name):
         """
@@ -1344,12 +1345,13 @@ class TargetListComets(object):
         p = np.polyfit(t, altitudes, 6)
         dense = np.polyval(p, np.linspace(0, 1, 200))
         maxp = np.argmax(dense)
+        maxv = np.max(dense)
         root = maxp/200.0
-        minus = np.polyval(p, maxp - 0.01)
-        plus = np.polyval(p, maxp + 0.01)
+        minus = np.polyval(p, root - 0.01)
+        plus = np.polyval(p, root + 0.01)
 
         # print('pypride ', (time[0] + root * u.day).iso)
-        return (time[0] + root*u.day < time[1]) and (np.max((minus, plus)) < maxp)
+        return (time[0] + root*u.day < time[-1]) and (np.max((minus, plus)) < maxv)
 
     def get_current_state(self, name):
         """
