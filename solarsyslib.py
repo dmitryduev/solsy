@@ -1830,6 +1830,8 @@ class TargetXML(object):
                     '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
                 ''' !!! NOTE: ra rate must be with a minus sign !!! '''
                 xml['Object'][0]['ra_rate'] = '{:.5f}'.format(-target[3][0])
+                ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(target[3][0])
                 xml['Object'][0]['dec_rate'] = '{:.5f}'.format(target[3][1])
                 #                print target[1].decimalyear, target[1].jyear,
                 #                        2000.0 + (target[1].jd-2451544.5)/365.25
