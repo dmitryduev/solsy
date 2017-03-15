@@ -538,8 +538,10 @@ def get_state_asteroid(_asteroid, _t, _jpl_eph, _inp, _station=None):
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
     else:
         dec = '{:03.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-    ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-    ra_rate = '{:.5f}'.format(-radec_dot[0])
+    ''' !!! NOTE: ra rate must be with a minus sign? !!! '''
+    # ra_rate = '{:.5f}'.format(-radec_dot[0])
+    ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+    ra_rate = '{:.5f}'.format(radec_dot[0])
     dec_rate = '{:.5f}'.format(radec_dot[1])
 
     return ra, dec, ra_rate, dec_rate, vmag
@@ -568,8 +570,10 @@ def get_state_asteroid_astropy(_asteroid, _t, _jpl_eph, _epoch='J2000', _station
         dec = '{:02.0f}d{:02.0f}m{:02.3f}s'.format(dec[0], abs(dec[1]), abs(dec[2]))
     else:
         dec = '{:03.0f}d{:02.0f}m{:02.3f}s'.format(dec[0], abs(dec[1]), abs(dec[2]))
-    ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-    ra_rate = '{:.5f}'.format(-radec_dot[0])
+    ''' !!! NOTE: ra rate must be with a minus sign? !!! '''
+    # ra_rate = '{:.5f}'.format(-radec_dot[0])
+    ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+    ra_rate = '{:.5f}'.format(radec_dot[0])
     dec_rate = '{:.5f}'.format(radec_dot[1])
 
     return ra, dec, ra_rate, dec_rate, vmag
