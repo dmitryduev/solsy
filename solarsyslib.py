@@ -956,7 +956,9 @@ class TargetListAsteroids(object):
         dec = dms(radec[1])
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
         ''' !!! NOTE: ra rate must be with a minus sign for the TCS !!! '''
-        ra_rate = '{:.5f}'.format(-radec_dot[0])
+        # ra_rate = '{:.5f}'.format(-radec_dot[0])
+        ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+        ra_rate = '{:.5f}'.format(radec_dot[0])
         dec_rate = '{:.5f}'.format(radec_dot[1])
 
         return ra, dec, ra_rate, dec_rate
@@ -1371,7 +1373,9 @@ class TargetListComets(object):
         dec = dms(radec[1])
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
         ''' !!! NOTE: ra rate must be with a minus sign for the TCS !!! '''
-        ra_rate = '{:.5f}'.format(-radec_dot[0])
+        # ra_rate = '{:.5f}'.format(-radec_dot[0])
+        ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+        ra_rate = '{:.5f}'.format(radec_dot[0])
         dec_rate = '{:.5f}'.format(radec_dot[1])
 
         return ra, dec, ra_rate, dec_rate
