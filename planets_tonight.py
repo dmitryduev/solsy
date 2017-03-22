@@ -53,7 +53,9 @@ if __name__ == '__main__':
     observatory = config.get('Observatory', 'observatory')
     timezone = config.get('Observatory', 'timezone')
 
-    # observability settings:
+    # settings:
+    # include moons?
+    include_moons = eval(config.get('Planets', 'include_moons'))
     # nighttime between twilights: astronomical (< -18 deg), civil (< -6 deg), nautical (< -12 deg)
     twilight = config.get('Planets', 'twilight')
     # fraction of night when observable given constraints:
@@ -70,7 +72,7 @@ if __name__ == '__main__':
 
     tl = TargetListPlanetsAndMoons(f_inp, _observatory=observatory, _m_lim=m_lim)
     # tl.target_list_all(today)
-    targets = tl.target_list_observable(tl.target_list_all(today), today,
+    targets = tl.target_list_observable(tl.target_list_all(today, include_moons), today,
                                         elv_lim=elv_lim, twilight=twilight, fraction=fraction)
 
     ''' make/change XML files '''

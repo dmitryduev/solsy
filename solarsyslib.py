@@ -634,7 +634,7 @@ class TargetListPlanetsAndMoons(object):
 
         return night, middle_of_night
 
-    def target_list_all(self, day):
+    def target_list_all(self, day, include_moons=False):
         """
             Get observational parameters for a (masked) target list
             from self.database
@@ -645,10 +645,13 @@ class TargetListPlanetsAndMoons(object):
         t = middle_of_night.datetime
         # print(t)
         # go over planets/moons:
-        bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto',
-                  'phobos',
-                  'europa', 'io', 'ganymede', 'callisto',
-                  'titan', 'enceladus', 'iapetus', 'mimas']
+        if include_moons:
+            bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto',
+                      'phobos',
+                      'europa', 'io', 'ganymede', 'callisto',
+                      'titan', 'enceladus', 'iapetus', 'mimas']
+        else:
+            bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
         target_list = []
 
         b = None  # I don't like red
