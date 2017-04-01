@@ -1714,7 +1714,7 @@ class TargetXML(object):
                                                 [OrderedDict([('number', 1),
                                                               ('exposure_time', 180),
                                                               ('ao_flag', 1),
-                                                              ('filter_code', 'FILTER_LONGPASS_600'),
+                                                              ('filter_code', 'FILTER_SLOAN_I'),
                                                               ('camera_mode', ''),
                                                               ('repeat_times', 1),
                                                               ('repeated', 0),
