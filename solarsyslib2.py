@@ -3280,6 +3280,9 @@ class TargetXML(object):
 
             _, target_data = target.to_dict()
 
+            if not target_data['is_observable']:
+                continue
+
             # update existing xml file
             if targetNames is not None and name in targetNames:
                 # print(name)
