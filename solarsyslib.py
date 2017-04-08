@@ -958,9 +958,7 @@ class TargetListAsteroids(object):
         ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
         dec = dms(radec[1])
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-        ''' !!! NOTE: ra rate must be with a minus sign for the TCS !!! '''
-        # ra_rate = '{:.5f}'.format(-radec_dot[0])
-        ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+
         ra_rate = '{:.5f}'.format(radec_dot[0])
         dec_rate = '{:.5f}'.format(radec_dot[1])
 
@@ -1375,9 +1373,7 @@ class TargetListComets(object):
         ra = '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(radec[0]))
         dec = dms(radec[1])
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-        ''' !!! NOTE: ra rate must be with a minus sign for the TCS !!! '''
-        # ra_rate = '{:.5f}'.format(-radec_dot[0])
-        ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+
         ra_rate = '{:.5f}'.format(radec_dot[0])
         dec_rate = '{:.5f}'.format(radec_dot[1])
 
@@ -1831,9 +1827,7 @@ class TargetXML(object):
                 dec = dms(target[2][1])
                 xml['Object'][0]['dec'] = \
                     '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-                ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(-target[3][0])
-                ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
+
                 xml['Object'][0]['ra_rate'] = '{:.5f}'.format(target[3][0])
                 xml['Object'][0]['dec_rate'] = '{:.5f}'.format(target[3][1])
                 #                print target[1].decimalyear, target[1].jyear,
@@ -1886,8 +1880,7 @@ class TargetXML(object):
                 dec = dms(target[2][1])
                 xml['Object'][0]['dec'] = \
                     '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-                ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(-target[3][0])
+                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(target[3][0])
                 xml['Object'][0]['dec_rate'] = '{:.5f}'.format(target[3][1])
                 if epoch == 'J2000':
                     xml['Object'][0]['epoch'] = '{:.1f}'.format(2000.0)

@@ -3271,17 +3271,14 @@ class TargetXML(object):
         # iterate over targets
         added_target_xml_files = 0
         for target in targets:
-            # if not is_planet_or_moon(target[0]['name']):
-            # asteroid or planet?
-            if not isinstance(target[0], dict) and 'num' in target[0].dtype.names:
-                name = '{:d} {:s}'.format(target[0]['num'], target[0]['name'])
-            else:
-                name = '{:s}'.format(target[0]['name'])
+            name = '{:s}'.format(target.object.name)
 
             # no spaces, please :(
             name = name.replace(' ', '_')
             # no primes too, please :(
             name = name.replace('\'', '_')
+
+            _, target_data = target.to_dict()
 
             # update existing xml file
             if targetNames is not None and name in targetNames:
@@ -3293,25 +3290,20 @@ class TargetXML(object):
                 elif is_multiple_asteroid(name):
                     xml['comment'] = \
                         'known_multiple;_modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
-                xml['Object'][0]['RA'] = \
-                    '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(target[2][0]))
-                dec = dms(target[2][1])
-                xml['Object'][0]['dec'] = \
-                    '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-                ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(-target[3][0])
-                ''' NOTE 2017/03/15: not sure about the new TCS! will try as is '''
-                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(target[3][0])
-                xml['Object'][0]['dec_rate'] = '{:.5f}'.format(target[3][1])
-                #                print target[1].decimalyear, target[1].jyear,
-                #                        2000.0 + (target[1].jd-2451544.5)/365.25
+
+                xml['Object'][0]['RA'] = target_data['mean_radec'][0]
+                xml['Object'][0]['dec'] = target_data['mean_radec'][1]
+
+                xml['Object'][0]['ra_rate'] = target_data['mean_radec_dot'][0]
+                xml['Object'][0]['dec_rate'] = target_data['mean_radec_dot'][1]
+
                 if epoch == 'J2000':
                     xml['Object'][0]['epoch'] = '{:.1f}'.format(2000.0)
                 else:
-                    xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
-                xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                    xml['Object'][0]['epoch'] = target_data['mean_epoch']
+                xml['Object'][0]['magnitude'] = target_data['mean_magnitude']
                 # set hour angle limit if target crosses meridian during the night:
-                if target[-1]:
+                if target_data['meridian_crossing']:
                     xml['Object'][0]['hour_angle_limit'] = '0.5'
                 else:
                     xml['Object'][0]['hour_angle_limit'] = ''
@@ -3327,7 +3319,7 @@ class TargetXML(object):
                         xml['Object'][0]['Observation'][ii]['done'] = 0
                 for ii, _ in enumerate(xml['Object'][0]['Observation']):
                     xml['Object'][0]['Observation'][ii]['camera_mode'] = \
-                        '{:s}'.format(getModefromMag(target[4]))
+                        '{:s}'.format(getModefromMag(float(target_data['mean_magnitude'])))
 
                 target_xml_path = os.path.join(self.path, targetNames[name])
             # print target_xml_path
@@ -3348,21 +3340,19 @@ class TargetXML(object):
                 elif is_multiple_asteroid(name):
                     xml['comment'] = \
                         'known_multiple;_modified_{:s}'.format('_'.join(str(datetime.datetime.now()).split()))
-                xml['Object'][0]['RA'] = \
-                    '{:02.0f}:{:02.0f}:{:02.3f}'.format(*hms(target[2][0]))
-                dec = dms(target[2][1])
-                xml['Object'][0]['dec'] = \
-                    '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-                ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-                xml['Object'][0]['ra_rate'] = '{:.5f}'.format(-target[3][0])
-                xml['Object'][0]['dec_rate'] = '{:.5f}'.format(target[3][1])
+
+                xml['Object'][0]['RA'] = target_data['mean_radec'][0]
+                xml['Object'][0]['dec'] = target_data['mean_radec'][1]
+
+                xml['Object'][0]['ra_rate'] = target_data['mean_radec_dot'][0]
+                xml['Object'][0]['dec_rate'] = target_data['mean_radec_dot'][1]
                 if epoch == 'J2000':
                     xml['Object'][0]['epoch'] = '{:.1f}'.format(2000.0)
                 else:
-                    xml['Object'][0]['epoch'] = '{:.9f}'.format(target[1].jyear)
-                xml['Object'][0]['magnitude'] = '{:.3f}'.format(target[4])
+                    xml['Object'][0]['epoch'] = target_data['mean_epoch']
+                xml['Object'][0]['magnitude'] = target_data['mean_magnitude']
                 # set hour angle limit if target crosses meridian during the night:
-                if target[-1]:
+                if target_data['meridian_crossing']:
                     xml['Object'][0]['hour_angle_limit'] = '0.5'
                 else:
                     xml['Object'][0]['hour_angle_limit'] = ''
@@ -3378,7 +3368,7 @@ class TargetXML(object):
                         xml['Object'][0]['Observation'][ii]['done'] = 0
                 for ii, _ in enumerate(xml['Object'][0]['Observation']):
                     xml['Object'][0]['Observation'][ii]['camera_mode'] = \
-                        '{:s}'.format(getModefromMag(target[4]))
+                        '{:s}'.format(getModefromMag(float(target_data['mean_magnitude'])))
 
                 target_xml_path = os.path.join(self.path,
                                                'Target_{:d}.xml'.format(max_xml_num +
