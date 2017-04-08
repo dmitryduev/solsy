@@ -3280,7 +3280,7 @@ class TargetXML(object):
 
             _, target_data = target.to_dict()
 
-            if not target_data['is_observable']:
+            if not target.is_observable:
                 continue
 
             # update existing xml file
