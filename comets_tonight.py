@@ -73,7 +73,7 @@ if __name__ == '__main__':
                           _observatory=observatory, _m_lim=m_lim, _elv_lim=elv_lim, _date=today)
     # get all bright targets given m_lim and check observability given elv_lim, twilight and fraction
     mask = None
-    tl.target_list(today, mask, _parallel=False, _epoch='J2000', _output_Vmag=True, _night_grid_n=40,
+    tl.target_list(today, mask, _parallel=True, _epoch='J2000', _output_Vmag=True, _night_grid_n=40,
                    _twilight=twilight, _fraction=fraction)
 
     ''' make/change XML files '''

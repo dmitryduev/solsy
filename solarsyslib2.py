@@ -2148,8 +2148,9 @@ class TargetListComets(TargetList):
         radec, radec_dot, Vmag = comet.raDecVmag(_mjd, self.inp['jpl_eph'], station=self.sta,
                                                  epoch=epoch, output_Vmag=output_Vmag, _cat_eop=self.inp['cat_eop'])
 
-        print(target['name'], [Angle(radec[0], unit=u.rad).hms, Angle(radec[1], unit=u.rad).dms],
-              radec_dot, Vmag, Time(_mjd, format='mjd', scale='tdb').utc.datetime)
+        # FIXME: debugging output
+        # print(target['name'], [Angle(radec[0], unit=u.rad).hms, Angle(radec[1], unit=u.rad).dms],
+        #       radec_dot, Vmag, Time(_mjd, format='mjd', scale='tdb').utc.datetime)
 
         return radec, radec_dot, Vmag
 
