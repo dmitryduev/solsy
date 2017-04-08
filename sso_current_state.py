@@ -92,7 +92,7 @@ class Kepler(object):
 
     @staticmethod
     # @jit
-    def kepler(e, M):
+    def kepler(e, M, max_iter=10):
         """ Solve Asteroid's equation
 
         :param e: eccentricity
@@ -101,10 +101,12 @@ class Kepler(object):
         """
         E = deepcopy(M)
         tmp = 1
+        n_iter = 1
 
-        while np.abs(E - tmp) > 1e-9:
+        while (np.abs(E - tmp) > 1e-9) or (n_iter <= max_iter):
             tmp = deepcopy(E)
             E += (M - E + e * np.sin(E)) / (1 - e * np.cos(E))
+            n_iter += 1
 
         return E
 
@@ -317,10 +319,10 @@ class Kepler(object):
             phi2l = np.exp(-1.862 * (np.tan(alpha / 2.0)) ** 1.218)
             phi2 = W * phi2s + (1.0 - W) * phi2l
 
-            AU_DE421 = 1.49597870699626200e+11  # m
+            AU_DE430 = 1.49597870700000000e+11  # m
 
             Vmag = self.H - 2.5 * np.log10((1.0 - self.G) * phi1 + self.G * phi2) + \
-                   5.0 * np.log10(EA_norm * SA_norm / AU_DE421 ** 2)
+                   5.0 * np.log10(EA_norm * SA_norm / AU_DE430 ** 2)
 
         # returning SkyCoord is handy, but very expensive
         # return (SkyCoord(ra=ra, dec=dec, unit=(u.rad, u.rad), frame='icrs'),
@@ -337,10 +339,10 @@ def get_asteroid_state(target, mjd, _kernel):
     :return: radec in rad, radec_dot in arcsec/s, Vmag
     """
 
-    AU_DE421 = 1.49597870699626200e+11  # m
-    GSUN = 0.295912208285591100e-03 * AU_DE421**3 / 86400.0**2
+    AU_DE430 = 1.49597870700000000e+11  # m
+    GSUN = 0.295912208285591100e-03 * AU_DE430 ** 3 / 86400.0 ** 2
     # convert AU to m:
-    a = target['a'] * AU_DE421
+    a = target['a'] * AU_DE430
     e = target['e']
     # convert deg to rad:
     i = target['i'] * np.pi / 180.0
@@ -414,7 +416,7 @@ def asteroid_data_load(_f_database, asteroid_name):
 def get_current_state_asteroid(_asteroid, _kernel):
     """
     :param _asteroid:
-    :param _kernel: DE421 SPK kernel
+    :param _kernel: D430 SPK kernel
     :return:
      current J2000 ra/dec of a moving object
      current J2000 ra/dec rates of a moving object
