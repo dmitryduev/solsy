@@ -5,7 +5,7 @@ A good friend of mine
 Follows the stars,
 Venus and Mars are alright tonight!
 
-Produce a _nightly_ list of observable planets/moons brighter than 16 mag
+Produce a _nightly_ list of observable comets brighter than 16 mag
 for the Robo-AO queue
 
 @autor: Dr Dmitry A. Duev [Caltech]
@@ -14,7 +14,7 @@ for the Robo-AO queue
 """
 
 import datetime
-from solarsyslib import TargetListComets, TargetXML
+from solarsyslib2 import TargetListComets, TargetXML
 import pytz
 import os
 import inspect
@@ -67,19 +67,24 @@ if __name__ == '__main__':
     # date in UTC!!! (for KP, it's the next day if it's still daytime)
     now = datetime.datetime.now(pytz.timezone(timezone))
     today = datetime.datetime(now.year, now.month, now.day) + datetime.timedelta(days=1)
+    print('\nstarted at:', datetime.datetime.now(pytz.timezone(timezone)))
 
-    tl = TargetListComets(f_inp, _observatory=observatory, _m_lim=m_lim)
-    # tl.target_list_all(today)
-    targets = tl.target_list_observable(tl.target_list_all(today), today,
-                                        elv_lim=elv_lim, twilight=twilight, fraction=fraction)
+    tl = TargetListComets(f_inp, database_source='mpc', database_file='CometEls.txt',
+                          _observatory=observatory, _m_lim=m_lim, _elv_lim=elv_lim, _date=today)
+    # get all bright targets given m_lim and check observability given elv_lim, twilight and fraction
+    mask = None
+    tl.target_list(today, mask, _parallel=False, _epoch='J2000', _output_Vmag=True, _night_grid_n=40,
+                   _twilight=twilight, _fraction=fraction)
 
     ''' make/change XML files '''
     path = config.get('Path', 'program_path')
     program_number = config.get('Path', 'program_number_comets')
+
     txml = TargetXML(path=path, program_number=program_number,
                      server=config.get('Path', 'queue_server'))
     # dump 'em targets!
-    c = txml.dumpTargets(targets, epoch='J2000')
+    c = txml.dumpTargets(tl.targets, epoch='J2000')
+
     if c is None:
         print('Successfully updated the target list via the website')
 
