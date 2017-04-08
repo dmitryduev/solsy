@@ -5,10 +5,6 @@ import inspect
 import ConfigParser
 
 if __name__ == '__main__':
-    # load config data
-    abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
-    config = ConfigParser.RawConfigParser()
-    config.read(os.path.join(abs_path, 'config.ini'))
 
     # create parser
     parser = argparse.ArgumentParser(prog='fixtargnums.py',
@@ -21,10 +17,24 @@ if __name__ == '__main__':
     # parser.add_argument('-n', '--name', action='store', type=str,
     #                     help='')
     # positional arguments
+    parser.add_argument('config_file', metavar='config_file',
+                        action='store', help='path to config file.', type=str)
     parser.add_argument('program_number', type=str, help='object name')
 
     # a parser exception (e.g. if no argument was given) will be caught
     args = parser.parse_args()
+    config_file = args.config_file
+
+    # load config data
+    config = ConfigParser.RawConfigParser()
+    try:
+        config.read(config_file)
+    except IOError:
+        try:
+            abs_path = os.path.dirname(inspect.getfile(inspect.currentframe()))
+            config.read(os.path.join(abs_path, 'config.ini'))
+        except IOError:
+            raise Exception('failed to read in the config file')
 
     ''' change XML files '''
     path = config.get('Path', 'program_path')
