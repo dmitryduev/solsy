@@ -651,7 +651,8 @@ class TargetListPlanetsAndMoons(object):
                       'europa', 'io', 'ganymede', 'callisto',
                       'titan', 'enceladus', 'iapetus', 'mimas']
         else:
-            bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
+            # bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
+            bodies = ['venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']
         target_list = []
 
         b = None  # I don't like red
