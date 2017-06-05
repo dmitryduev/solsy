@@ -16,7 +16,7 @@ if __name__ == '__main__':
                         help='look for string in comment')
     parser.add_argument('-n', '--name', action='store', type=str,
                         help='look for string in source name')
-    parser.add_argument('-d', '--done', action='store_true', type=str,
+    parser.add_argument('-d', '--done', action='store_true',
                         help='mark done instead')
     # positional arguments
     parser.add_argument('config_file', metavar='config_file',
