@@ -13,9 +13,11 @@ if __name__ == '__main__':
     # optional arguments
     # filter targets by these criteria
     parser.add_argument('-c', '--comment', action='store', type=str,
-                        help='')
+                        help='look for string in comment')
     parser.add_argument('-n', '--name', action='store', type=str,
-                        help='')
+                        help='look for string in source name')
+    parser.add_argument('-d', '--done', action='store_true', type=str,
+                        help='mark done instead')
     # positional arguments
     parser.add_argument('config_file', metavar='config_file',
                         action='store', help='path to config file.', type=str)
@@ -49,7 +51,10 @@ if __name__ == '__main__':
         # print(os.path.join(program_path, xml), f_lines)
         if (not args.comment and not args.name) or (args.comment and args.comment in f_lines) or \
                 (args.name and args.name in f_lines):
-            f_lines = f_lines.replace('<done>1</done>', '<done>0</done>')
+            if not args.done:
+                f_lines = f_lines.replace('<done>1</done>', '<done>0</done>')
+            else:
+                f_lines = f_lines.replace('<done>0</done>', '<done>1</done>')
             # print(os.path.join(program_path, xml), f_lines)
             # print(os.path.join(program_path, xml), '<done>1</done>' in f_lines)
             changed = True
