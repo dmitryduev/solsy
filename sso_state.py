@@ -705,16 +705,16 @@ if __name__ == '__main__':
     parser = ArgumentParser(prog='sso_state.py',
                             formatter_class=argparse.RawDescriptionHelpFormatter,
                             description='Get state of a Solar system object.')
-    # optional arguments
-    # parser.add_argument('-p', '--parallel', action='store_true',
-    #                     help='run computation in parallel mode')
     # positional arguments
     parser.add_argument('name', type=str, help='object name')
     parser.add_argument('ra_apr', type=str, help='object RA for middle of night')
     parser.add_argument('dec_apr', type=str, help='object Dec for middle of night')
     parser.add_argument('ra_rate_apr', type=str, help='object RA rate for middle of night')
     parser.add_argument('dec_rate_apr', type=str, help='object Dec rate for middle of night')
-    parser.add_argument('time', type=str, help='UTC time for calculation (YYYYmmdd_HHMMSS[.ffffff])')
+    # optional arguments
+    # parser.add_argument('-p', '--parallel', action='store_true',
+    #                     help='run computation in parallel mode')
+    parser.add_argument('-t', '--time', type=str, help='UTC time for calculation (YYYYmmdd_HHMMSS[.ffffff])')
 
     # a parser exception (e.g. if no argument was given) will be caught
     args = parser.parse_args()
