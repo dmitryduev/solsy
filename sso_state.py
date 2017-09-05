@@ -735,7 +735,7 @@ if __name__ == '__main__':
             time = Time(str(datetime.datetime.strptime(args.time, '%Y%m%d_%H%M%S')), format='iso', scale='utc')
     else:
         time = Time(str(datetime.datetime.utcnow()), format='iso', scale='utc')
-    print(time)
+    # print(time)
 
     if not is_planet_or_moon(name):
         ''' asteroids '''
