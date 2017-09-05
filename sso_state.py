@@ -728,10 +728,14 @@ if __name__ == '__main__':
     dec_rate_apr = args.dec_rate_apr
 
     # get UTC time (astropy.time.Time object)
-    if '.' in args.time:
-        time = Time(str(datetime.datetime.strptime(args.time, '%Y%m%d_%H%M%S.%f')), format='iso', scale='utc')
+    if args.time:
+        if '.' in args.time:
+            time = Time(str(datetime.datetime.strptime(args.time, '%Y%m%d_%H%M%S.%f')), format='iso', scale='utc')
+        else:
+            time = Time(str(datetime.datetime.strptime(args.time, '%Y%m%d_%H%M%S')), format='iso', scale='utc')
     else:
-        time = Time(str(datetime.datetime.strptime(args.time, '%Y%m%d_%H%M%S')), format='iso', scale='utc')
+        time = Time(str(datetime.datetime.utcnow()), format='iso', scale='utc')
+    print(time)
 
     if not is_planet_or_moon(name):
         ''' asteroids '''
