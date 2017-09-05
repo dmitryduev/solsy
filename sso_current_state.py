@@ -435,8 +435,9 @@ def get_current_state_asteroid(_asteroid, _kernel):
         dec = '{:02.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
     else:
         dec = '{:03.0f}:{:02.0f}:{:02.3f}'.format(dec[0], abs(dec[1]), abs(dec[2]))
-    ''' !!! NOTE: ra rate must be with a minus sign !!! '''
-    ra_rate = '{:.5f}'.format(-radec_dot[0])
+    # ''' !!! NOTE: ra rate must be with a minus sign !!! '''
+    # ra_rate = '{:.5f}'.format(-radec_dot[0])
+    ra_rate = '{:.5f}'.format(radec_dot[0])
     dec_rate = '{:.5f}'.format(radec_dot[1])
 
     return ra, dec, ra_rate, dec_rate
